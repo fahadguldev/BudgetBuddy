@@ -54,8 +54,9 @@
   --sidebar-border: hsl(220 13% 91%);
   --sidebar-ring: hsl(158 64% 52%);
 
-  /* Fonts */
-  --font-sans: Inter, sans-serif;
+  /* Fonts — Outfit for display/numbers, Inter for body */
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-display: Outfit, Inter, ui-sans-serif, system-ui, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
 
@@ -139,9 +140,73 @@
     @apply border-border;
   }
 
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
   }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Money + stats always use tabular figures so columns don't jitter */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  /* Safe-area padding for fixed bottom bars on notched phones */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in,
+  .slide-up {
+    animation: none;
+  }
+}
+
+/* Recharts — keep charts legible in dark mode (component uses fixed light colors) */
+.dark .recharts-cartesian-grid line {
+  stroke: var(--border);
+}
+.dark .recharts-cartesian-axis-tick text {
+  fill: var(--muted-foreground);
+}
+.dark .recharts-cartesian-axis line {
+  stroke: var(--border);
+}
+.dark .recharts-default-tooltip {
+  background-color: var(--popover) !important;
+  border-color: var(--border) !important;
+  color: var(--popover-foreground) !important;
 }
 
 /* PWA specific styles */
