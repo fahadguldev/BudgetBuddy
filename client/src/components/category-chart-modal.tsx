@@ -131,7 +131,7 @@ export default function CategoryChartModal({ open, onOpenChange, category, expen
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md p-0 gap-0">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md p-0 gap-0 rounded-3xl overflow-hidden border border-border shadow-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="p-4 pb-3 border-b">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
