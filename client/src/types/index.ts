@@ -91,6 +91,17 @@ export interface RecurringExpense {
   createdAt: Date;
 }
 
+export type SavingsType = 'goal' | 'sip' | 'general';
+export type SavingsCategory = 'emergency-fund' | 'stocks' | 'mutual-funds' | 'savings-acct' | 'crypto' | 'gold' | 'custom' | string;
+
+export interface SavingsContribution {
+  id: string;
+  amount: number;
+  date: string;
+  note?: string;
+  sourceCategory?: string;
+}
+
 export interface SavingsGoal {
   id: string;
   name: string;
@@ -99,6 +110,10 @@ export interface SavingsGoal {
   targetDate: Date | null;
   icon: string;
   color: string;
+  type?: SavingsType;
+  category?: SavingsCategory;
+  monthlyContribution?: string;
+  contributions?: SavingsContribution[];
   createdAt: Date;
 }
 
