@@ -127,11 +127,11 @@ export default function DataManagement() {
 
 
                     <div className="grid grid-cols-2 gap-2">
-                        <Button onClick={handleExportCSV} disabled={loading} variant="outline" className="w-full justify-start">
+                        <Button onClick={handleExportCSV} disabled={loading} variant="outline" className="w-full justify-start h-11 rounded-xl">
                             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
                             Export CSV
                         </Button>
-                        <Button onClick={handleExportPDF} disabled={loading} variant="outline" className="w-full justify-start">
+                        <Button onClick={handleExportPDF} disabled={loading} variant="outline" className="w-full justify-start h-11 rounded-xl">
                             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
                             Export PDF
                         </Button>
