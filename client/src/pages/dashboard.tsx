@@ -92,12 +92,9 @@ export default function Dashboard() {
                 <DollarSign className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="font-display font-bold text-lg tracking-tight leading-none">
+                <h1 className="font-display font-bold text-lg tracking-tight">
                   BudgetBuddy
                 </h1>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Personal Finance Hub
-                </p>
               </div>
             </div>
 
