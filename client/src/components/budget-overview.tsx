@@ -1,10 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, AlertTriangle, CheckCircle, Wallet, PieChart } from "lucide-react";
-import { useState, useEffect } from "react";
+import {
+  TrendingUp,
+  AlertTriangle,
+  CheckCircle,
+  Wallet,
+  Calendar,
+  Sparkles,
+  ArrowUpRight,
+  ShieldCheck,
+  Zap,
+} from "lucide-react";
 import { useSettings } from "@/hooks/use-settings";
 
-// Mock BudgetSummary type - in real app this would be imported
 interface BudgetSummary {
   monthlyBudget: number;
   totalAllocated: number;
@@ -17,186 +25,217 @@ interface BudgetSummary {
 interface BudgetOverviewProps {
   summary: BudgetSummary | undefined;
   isLoading: boolean;
+  onSetIncomeClick?: () => void;
 }
 
-export default function BudgetOverview({ summary, isLoading }: BudgetOverviewProps) {
+export default function BudgetOverview({
+  summary,
+  isLoading,
+  onSetIncomeClick,
+}: BudgetOverviewProps) {
   const { data: settings } = useSettings();
-  const currency = settings?.currency || 'PKR';
-  const [animateProgress, setAnimateProgress] = useState(false);
-
-  useEffect(() => {
-    if (summary) {
-      const timer = setTimeout(() => setAnimateProgress(true), 100);
-      return () => clearTimeout(timer);
-    }
-  }, [summary]);
+  const currency = settings?.currency || "PKR";
 
   if (isLoading) {
     return (
-      <div className="mx-4 mt-4 space-y-4">
-        <Card className="overflow-hidden border-0 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-          <CardContent className="p-8">
-            <div className="grid md:grid-cols-2 gap-8">
-              <div className="space-y-4">
-                <Skeleton className="h-6 w-32" />
-                <Skeleton className="h-12 w-48" />
-                <Skeleton className="h-4 w-full max-w-sm" />
-              </div>
-              <div className="space-y-4">
-                <Skeleton className="h-4 w-full" />
-                <div className="flex justify-between">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-24" />
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-20 w-full rounded-xl" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="max-w-md mx-auto px-4 mt-4">
+        <Skeleton className="h-64 w-full rounded-3xl" />
       </div>
     );
   }
 
-  if (!summary) {
+  if (!summary || summary.monthlyBudget === 0) {
     return (
-      <div className="mx-4 mt-4">
-        <Card className="border-0 shadow-lg">
-          <CardContent className="p-8 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-              <PieChart className="w-8 h-8 text-gray-400" />
+      <div className="max-w-md mx-auto px-4 mt-4">
+        <Card className="rounded-3xl border-0 shadow-lg bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-950 text-white overflow-hidden p-6 relative">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-400/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-teal-400/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="flex flex-col items-center text-center py-4 relative z-10">
+            <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center mb-3 border border-white/20">
+              <Wallet className="w-7 h-7 text-white" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">No Budget Data</h3>
-            <p className="text-muted-foreground">Set up your monthly budget to start tracking your finances</p>
-          </CardContent>
+            <h3 className="font-display text-xl font-bold tracking-tight">
+              Start Tracking Your Budget
+            </h3>
+            <p className="text-sm text-white/80 mt-1 max-w-xs">
+              Set your monthly salary or income to unlock budget allocations and live spending tracking.
+            </p>
+            {onSetIncomeClick && (
+              <button
+                type="button"
+                onClick={onSetIncomeClick}
+                className="mt-4 px-5 py-2.5 rounded-2xl bg-white text-emerald-950 font-semibold text-sm shadow-md hover:bg-white/90 active:scale-95 transition-all flex items-center gap-1.5"
+              >
+                <Sparkles className="w-4 h-4 text-emerald-600" />
+                <span>Set Monthly Income</span>
+              </button>
+            )}
+          </div>
         </Card>
       </div>
     );
   }
 
-  const allocationPercentage = summary.monthlyBudget > 0 ? (summary.totalAllocated / summary.monthlyBudget) * 100 : 0;
-  const spentPercentage = summary.monthlyBudget > 0 ? (summary.totalSpent / summary.monthlyBudget) * 100 : 0;
+  const spentPercentage =
+    summary.monthlyBudget > 0
+      ? (summary.totalSpent / summary.monthlyBudget) * 100
+      : 0;
   const availableAmount = summary.monthlyBudget - summary.totalSpent;
   const isOverBudget = summary.totalSpent > summary.monthlyBudget;
   const isOverAllocated = summary.totalAllocated > summary.monthlyBudget;
-  const dailyBudget = summary.daysLeft > 0 ? availableAmount / summary.daysLeft : 0;
+  const dailyBudget =
+    summary.daysLeft > 0 ? availableAmount / summary.daysLeft : 0;
 
   const getBudgetStatus = () => {
-    if (isOverBudget) return { text: "Over Budget", color: "text-red-600", icon: AlertTriangle, bgColor: "bg-red-50 dark:bg-red-900/20" };
-    if (spentPercentage > 80) return { text: "Almost Spent", color: "text-orange-600", icon: TrendingUp, bgColor: "bg-orange-50 dark:bg-orange-900/20" };
-    if (spentPercentage < 50) return { text: "On Track", color: "text-green-600", icon: CheckCircle, bgColor: "bg-green-50 dark:bg-green-900/20" };
-    return { text: "Good Progress", color: "text-blue-600", icon: TrendingUp, bgColor: "bg-blue-50 dark:bg-blue-900/20" };
+    if (isOverBudget) {
+      return {
+        text: "Over Budget",
+        badgeBg: "bg-rose-500/20 text-rose-200 border-rose-500/30",
+        icon: AlertTriangle,
+      };
+    }
+    if (spentPercentage > 85) {
+      return {
+        text: "Caution (85%+)",
+        badgeBg: "bg-amber-500/20 text-amber-200 border-amber-500/30",
+        icon: AlertTriangle,
+      };
+    }
+    if (spentPercentage < 50) {
+      return {
+        text: "Healthy & On Track",
+        badgeBg: "bg-emerald-500/20 text-emerald-200 border-emerald-500/30",
+        icon: ShieldCheck,
+      };
+    }
+    return {
+      text: "Normal Pace",
+      badgeBg: "bg-teal-500/20 text-teal-200 border-teal-500/30",
+      icon: TrendingUp,
+    };
   };
 
   const status = getBudgetStatus();
   const StatusIcon = status.icon;
 
   return (
-    <div className="mx-4 mt-4 space-y-4" data-testid="budget-overview">
-      {/* Main Budget Card */}
-      <Card className="overflow-hidden border-0 shadow-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
+    <div className="max-w-md mx-auto px-4 mt-4" data-testid="budget-overview">
+      <div className="bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-950 text-white rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden backdrop-blur-xl border border-white/10">
+        {/* Glow background effects */}
+        <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-400/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-teal-400/10 rounded-full blur-3xl pointer-events-none" />
 
-      </Card>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-        {/* Total Spent */}
-        <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-red-600 dark:text-red-400" />
-              </div>
-              {spentPercentage > 80 && <AlertTriangle className="w-4 h-4 text-orange-500" />}
-            </div>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="total-spent">
-              {currency} {summary.totalSpent.toLocaleString()}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">Total Spent</p>
-            <div className="mt-2 text-xs">
-              <span className={`font-medium ${spentPercentage > 100 ? 'text-red-600' : 'text-gray-600'}`}>
-                {spentPercentage.toFixed(1)}% of budget
+        <div className="relative z-10 space-y-4">
+          {/* Header Row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase tracking-wider text-white/70 font-semibold flex items-center gap-1">
+                <Wallet className="w-3.5 h-3.5 text-emerald-300" /> Available Cash
               </span>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Available Amount */}
-        <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-              {availableAmount > summary.monthlyBudget * 0.5 && <CheckCircle className="w-4 h-4 text-green-500" />}
+            <div
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border backdrop-blur-md ${status.badgeBg}`}
+            >
+              <StatusIcon className="w-3.5 h-3.5" />
+              <span>{status.text}</span>
             </div>
-            <p className={`text-2xl font-bold ${availableAmount < 0 ? 'text-red-600' : 'text-gray-900 dark:text-white'}`} data-testid="available-amount">
-              {currency} {availableAmount.toLocaleString()}
+          </div>
+
+          {/* Large Available Amount */}
+          <div>
+            <div className="flex items-baseline gap-2">
+              <h2
+                className={`font-display text-3xl sm:text-4xl font-extrabold tracking-tight tnum ${
+                  availableAmount < 0 ? "text-rose-300" : "text-white"
+                }`}
+                data-testid="available-amount"
+              >
+                {currency} {availableAmount.toLocaleString()}
+              </h2>
+            </div>
+            <p className="text-xs text-white/70 mt-1 flex items-center gap-1">
+              <span>of</span>
+              <span className="font-semibold text-white/90">
+                {currency} {summary.monthlyBudget.toLocaleString()}
+              </span>
+              <span>total monthly income</span>
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Available</p>
-            {summary.daysLeft > 0 && (
-              <div className="mt-2 text-xs text-green-600 dark:text-green-400 font-medium">
-                {currency} {dailyBudget.toLocaleString()}/day
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Categories and Days Left cards removed as per request */}
-      </div>
-
-      {/* Insights Card */}
-      {(isOverBudget || isOverAllocated || summary.daysLeft <= 7) && (
-        <Card className="border-l-4 border-l-orange-500 bg-orange-50 dark:bg-orange-900/20">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <h4 className="font-semibold text-orange-800 dark:text-orange-200 mb-2">Budget Alerts</h4>
-                <ul className="space-y-1 text-sm text-orange-700 dark:text-orange-300">
-                  {isOverBudget && <li>• You've exceeded your monthly budget by {currency} {(summary.totalSpent - summary.monthlyBudget).toLocaleString()}</li>}
-                  {isOverAllocated && <li>• Your allocations exceed the budget by {currency} {(summary.totalAllocated - summary.monthlyBudget).toLocaleString()}</li>}
-                  {summary.daysLeft <= 7 && <li>• Only {summary.daysLeft} days left in the current month</li>}
-                </ul>
-              </div>
+          {/* Progress bar */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-white/80">
+              <span>Spent {Math.round(spentPercentage)}%</span>
+              <span>
+                {Math.max(0, 100 - Math.round(spentPercentage))}% remaining
+              </span>
             </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
+            <div className="w-full bg-white/20 h-2.5 rounded-full overflow-hidden backdrop-blur-sm">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  isOverBudget
+                    ? "bg-rose-400"
+                    : spentPercentage > 85
+                    ? "bg-amber-400"
+                    : "bg-emerald-400"
+                }`}
+                style={{ width: `${Math.min(spentPercentage, 100)}%` }}
+              />
+            </div>
+          </div>
 
-// Demo component with mock data
-function BudgetOverviewDemo() {
-  const [isLoading, setIsLoading] = useState(true);
+          {/* Glassmorphic Stats Grid */}
+          <div className="grid grid-cols-3 gap-2 pt-1">
+            {/* Total Spent */}
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2.5 border border-white/15">
+              <div className="flex items-center gap-1 text-[11px] text-white/70">
+                <TrendingUp className="w-3 h-3 text-rose-300" />
+                <span>Spent</span>
+              </div>
+              <p
+                className="font-display font-bold text-sm sm:text-base text-white mt-1 truncate tnum"
+                data-testid="total-spent"
+              >
+                {currency} {summary.totalSpent.toLocaleString()}
+              </p>
+            </div>
 
-  const mockSummary: BudgetSummary = {
-    monthlyBudget: 150000,
-    totalAllocated: 140000,
-    totalSpent: 95000,
-    remainingBudget: 10000,
-    categoryCount: 8,
-    daysLeft: 12
-  };
+            {/* Total Allocated */}
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2.5 border border-white/15">
+              <div className="flex items-center gap-1 text-[11px] text-white/70">
+                <Zap className="w-3 h-3 text-amber-300" />
+                <span>Allocated</span>
+              </div>
+              <p className="font-display font-bold text-sm sm:text-base text-white mt-1 truncate tnum">
+                {currency} {summary.totalAllocated.toLocaleString()}
+              </p>
+            </div>
 
-  // Simulate loading
-  useState(() => {
-    const timer = setTimeout(() => setIsLoading(false), 2000);
-    return () => clearTimeout(timer);
-  });
+            {/* Daily Budget or Days Left */}
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2.5 border border-white/15">
+              <div className="flex items-center gap-1 text-[11px] text-white/70">
+                <Calendar className="w-3 h-3 text-emerald-300" />
+                <span>Daily Pace</span>
+              </div>
+              <p className="font-display font-bold text-sm sm:text-base text-white mt-1 truncate tnum">
+                {dailyBudget > 0
+                  ? `${currency} ${Math.round(dailyBudget).toLocaleString()}`
+                  : `${summary.daysLeft}d left`}
+              </p>
+            </div>
+          </div>
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-8 px-4">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Budget Overview</h1>
-          <p className="text-muted-foreground mt-2">Track your monthly budget and spending patterns</p>
+          {/* Over-allocation warning banner if applicable */}
+          {isOverAllocated && (
+            <div className="flex items-center gap-2 p-2 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-200 text-xs">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-300" />
+              <span>
+                Allocations exceed income by {currency}{" "}
+                {(summary.totalAllocated - summary.monthlyBudget).toLocaleString()}
+              </span>
+            </div>
+          )}
         </div>
-        <BudgetOverview summary={isLoading ? undefined : mockSummary} isLoading={isLoading} />
       </div>
     </div>
   );
