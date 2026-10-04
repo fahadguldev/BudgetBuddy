@@ -51,7 +51,7 @@ export default function ResetTransactionsModal({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Reset All Transactions?</AlertDialogTitle>
-          <AlertDialogDescription>
+          <AlertDialogDescription>  
             This action cannot be undone. This will permanently delete all{" "}
             <strong>{transactionCount}</strong> transaction{transactionCount !== 1 ? "s" : ""} for this month
             and reset your spending data.
