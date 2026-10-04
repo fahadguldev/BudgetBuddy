@@ -1,5 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { User, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import {
+    User,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signOut,
+    onAuthStateChanged,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    updateProfile,
+} from "firebase/auth";
 import { auth, isFirebaseConfigured } from "@/lib/firebase";
 import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
@@ -11,6 +20,8 @@ interface AuthContextType {
     isGuest: boolean;
     isConfigured: boolean;
     signInWithGoogle: () => Promise<void>;
+    signUpWithEmail: (email: string, password: string, name?: string) => Promise<void>;
+    signInWithEmail: (email: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
     continueAsGuest: () => void;
 }
@@ -60,6 +71,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const signUpWithEmail = async (email: string, password: string, name?: string) => {
+        if (!auth) {
+            throw new Error("Firebase Authentication is not configured. Please set Firebase environment variables.");
+        }
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            if (name && userCredential.user) {
+                await updateProfile(userCredential.user, { displayName: name });
+                setUser({ ...userCredential.user, displayName: name });
+            }
+        } catch (error) {
+            console.error("Error signing up with email", error);
+            throw error;
+        }
+    };
+
+    const signInWithEmail = async (email: string, password: string) => {
+        if (!auth) {
+            throw new Error("Firebase Authentication is not configured. Please set Firebase environment variables.");
+        }
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (error) {
+            console.error("Error signing in with email", error);
+            throw error;
+        }
+    };
+
     const logout = async () => {
         try {
             if (auth) {
@@ -85,6 +124,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 isGuest: !user,
                 isConfigured: isFirebaseConfigured,
                 signInWithGoogle,
+                signUpWithEmail,
+                signInWithEmail,
                 logout,
                 continueAsGuest
             }}
