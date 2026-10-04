@@ -137,6 +137,8 @@ export default function SavingsGoals() {
   // Filter state
   const [activeTypeTab, setActiveTypeTab] = useState<"all" | SavingsType>("all");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("all");
+  const [breakdownView, setBreakdownView] = useState<"category" | "goal">("category");
+  const [chartMetric, setChartMetric] = useState<"saved" | "target">("saved");
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -222,7 +224,7 @@ export default function SavingsGoals() {
 
   // Category breakdown for chart and cards
   const categoryBreakdown = useMemo(() => {
-    const map = new Map<string, { categoryId: string; name: string; total: number; count: number; color: string; icon: any }>();
+    const map = new Map<string, { categoryId: string; name: string; total: number; target: number; count: number; color: string; icon: any }>();
 
     goals.forEach((g) => {
       const catId = g.category || "custom";
@@ -231,12 +233,14 @@ export default function SavingsGoals() {
         categoryId: catId,
         name: meta.name,
         total: 0,
+        target: 0,
         count: 0,
         color: g.color || meta.color,
         icon: meta.icon,
       };
 
       existing.total += Number(g.currentAmount || 0);
+      existing.target += Number(g.targetAmount || 0);
       existing.count += 1;
       map.set(catId, existing);
     });
@@ -244,16 +248,36 @@ export default function SavingsGoals() {
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [goals]);
 
-  // Donut chart data
+  // Individual goal-level breakdown
+  const goalBreakdown = useMemo(() => {
+    return goals.map((g) => {
+      const meta = getCategoryMeta(g.category);
+      return {
+        categoryId: g.id,
+        name: g.name,
+        total: Number(g.currentAmount || 0),
+        target: Number(g.targetAmount || 0),
+        count: 1,
+        color: g.color || meta.color,
+        icon: meta.icon,
+      };
+    }).sort((a, b) => b.total - a.total);
+  }, [goals]);
+
+  const activeBreakdown = useMemo(() => {
+    return breakdownView === "category" ? categoryBreakdown : goalBreakdown;
+  }, [breakdownView, categoryBreakdown, goalBreakdown]);
+
+  // Donut chart data (filters out 0 values for circular geometry)
   const chartData = useMemo(() => {
-    return categoryBreakdown
-      .filter((c) => c.total > 0)
+    return activeBreakdown
       .map((c) => ({
         name: c.name,
-        value: c.total,
+        value: chartMetric === "saved" ? c.total : (c.target > 0 ? c.target : c.total),
         color: c.color,
-      }));
-  }, [categoryBreakdown]);
+      }))
+      .filter((c) => c.value > 0);
+  }, [activeBreakdown, chartMetric]);
 
   // Filtered goals
   const filteredGoals = useMemo(() => {
@@ -546,65 +570,142 @@ export default function SavingsGoals() {
           </div>
         </div>
 
-        {/* Category Breakdown & Distribution Section */}
-        {categoryBreakdown.length > 0 && (
+        {/* Category & Goal Breakdown Section */}
+        {activeBreakdown.length > 0 && (
           <Card className="rounded-2xl border-0 shadow-md overflow-hidden">
             <CardHeader className="pb-2 pt-4 px-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="font-display text-sm font-bold tracking-tight">Category-Wise Allocation</CardTitle>
-                <span className="text-xs text-muted-foreground">{categoryBreakdown.length} active buckets</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="font-display text-sm font-bold tracking-tight">Portfolio Allocation</CardTitle>
+                  <p className="text-[11px] text-muted-foreground">
+                    {activeBreakdown.length} {breakdownView === "category" ? "categories" : "individual goals"}
+                  </p>
+                </div>
+
+                {/* Toggles for View Mode and Metric */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Category vs Goal View */}
+                  <div className="flex items-center gap-0.5 bg-muted/60 p-0.5 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setBreakdownView("category")}
+                      className={`text-[10px] px-2 py-0.5 rounded-md font-medium transition-all ${
+                        breakdownView === "category"
+                          ? "bg-background text-foreground shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      By Category
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBreakdownView("goal")}
+                      className={`text-[10px] px-2 py-0.5 rounded-md font-medium transition-all ${
+                        breakdownView === "goal"
+                          ? "bg-background text-foreground shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      By Goal
+                    </button>
+                  </div>
+
+                  {/* Saved vs Target Metric */}
+                  <div className="flex items-center gap-0.5 bg-muted/60 p-0.5 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setChartMetric("saved")}
+                      className={`text-[10px] px-2 py-0.5 rounded-md font-medium transition-all ${
+                        chartMetric === "saved"
+                          ? "bg-background text-foreground shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Saved
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChartMetric("target")}
+                      className={`text-[10px] px-2 py-0.5 rounded-md font-medium transition-all ${
+                        chartMetric === "target"
+                          ? "bg-background text-foreground shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Target
+                    </button>
+                  </div>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-4 pt-1 space-y-4">
               {/* Donut Chart + Legend */}
               <div className="flex items-center justify-between gap-4">
                 <div className="w-32 h-32 flex-shrink-0 relative flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={chartData}
-                        innerRadius={36}
-                        outerRadius={56}
-                        paddingAngle={3}
-                        dataKey="value"
-                      >
-                        {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(val: number) => [`${currency} ${val.toLocaleString()}`, "Saved"]}
-                        contentStyle={{
-                          backgroundColor: "#1e293b",
-                          borderColor: "#334155",
-                          borderRadius: 8,
-                          color: "#fff",
-                          fontSize: 11,
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-[9px] text-muted-foreground font-medium">TOTAL</span>
-                    <span className="text-[11px] font-bold tnum">{chartData.length}</span>
+                  {chartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={chartData}
+                          innerRadius={36}
+                          outerRadius={56}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(val: number) => [`${currency} ${val.toLocaleString()}`, chartMetric === "saved" ? "Saved" : "Target"]}
+                          contentStyle={{
+                            backgroundColor: "#1e293b",
+                            borderColor: "#334155",
+                            borderRadius: 8,
+                            color: "#fff",
+                            fontSize: 11,
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="w-28 h-28 rounded-full border-4 border-dashed border-muted flex items-center justify-center text-center p-2">
+                      <span className="text-[10px] text-muted-foreground">No {chartMetric} funds</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                    <span className="text-[8px] text-muted-foreground font-semibold uppercase tracking-wider">
+                      {chartMetric === "saved" ? "SAVED" : "TARGET"}
+                    </span>
+                    <span className="text-xs font-bold tnum">
+                      {activeBreakdown.length} {breakdownView === "category" ? "Cats" : "Goals"}
+                    </span>
                   </div>
                 </div>
 
-                {/* Top Categories List */}
-                <div className="flex-1 space-y-2 min-w-0">
-                  {categoryBreakdown.slice(0, 4).map((cat) => {
-                    const percent = portfolioStats.totalSaved > 0 ? (cat.total / portfolioStats.totalSaved) * 100 : 0;
-                    const IconComp = cat.icon || Target;
+                {/* Items List with All Buckets/Goals */}
+                <div className="flex-1 space-y-2 min-w-0 max-h-48 overflow-y-auto pr-1">
+                  {activeBreakdown.map((item) => {
+                    const totalVal = chartMetric === "saved" ? portfolioStats.totalSaved : portfolioStats.totalTarget;
+                    const currentVal = chartMetric === "saved" ? item.total : (item.target > 0 ? item.target : item.total);
+                    const percent = totalVal > 0 ? (currentVal / totalVal) * 100 : 0;
+                    const isZero = currentVal === 0;
+
                     return (
-                      <div key={cat.categoryId} className="space-y-1">
+                      <div key={item.categoryId} className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-1.5 truncate">
-                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
-                            <span className="font-medium truncate">{cat.name}</span>
+                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                            <span className="font-medium truncate">{item.name}</span>
                           </div>
-                          <span className="font-bold tnum text-muted-foreground ml-2">
-                            {currency} {cat.total.toLocaleString()}
-                          </span>
+                          <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                            <span className={`font-bold tnum ${isZero ? "text-muted-foreground" : "text-foreground"}`}>
+                              {currency} {currentVal.toLocaleString()}
+                            </span>
+                            {isZero && chartMetric === "saved" && (
+                              <span className="text-[9px] text-amber-500 font-medium">(0%)</span>
+                            )}
+                          </div>
                         </div>
                         <Progress value={percent} className="h-1.5 rounded-full" />
                       </div>
@@ -613,7 +714,14 @@ export default function SavingsGoals() {
                 </div>
               </div>
 
-              {/* Category Pills Filter */}
+              {/* Informative helper if any item is 0 in saved mode */}
+              {chartMetric === "saved" && chartData.length < activeBreakdown.length && (
+                <p className="text-[10px] text-muted-foreground">
+                  💡 {activeBreakdown.length - chartData.length} bucket(s) currently have {currency} 0 saved. Switch to <button type="button" onClick={() => setChartMetric("target")} className="text-primary font-semibold underline">Target view</button> or add deposits to see them on the donut chart.
+                </p>
+              )}
+
+              {/* Category Filter Chips */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 no-scrollbar">
                 <button
                   onClick={() => setSelectedCategoryFilter("all")}
