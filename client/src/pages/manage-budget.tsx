@@ -12,7 +12,7 @@ import { storageService } from "@/lib/storage";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Category, BudgetAllocation } from "@/types";
-import { ShoppingCart, Car, FileText, Zap, Smile, ArrowLeft, Plus, Wallet, TrendingUp, ChevronDown, ChevronUp, BarChart3, Trash2 } from "lucide-react";
+import { ShoppingCart, Car, FileText, Zap, Smile, ArrowLeft, Plus, Wallet, TrendingUp, ChevronDown, ChevronUp, BarChart3, Trash2, RotateCcw, FolderPlus } from "lucide-react";
 import { useSettings } from "@/hooks/use-settings";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,8 @@ import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, subWeeks
 import { useExpenses } from "@/hooks/use-expenses";
 import ResetTransactionsModal from "@/components/reset-transactions-modal";
 import MonthSelector from "@/components/month-selector";
+import CreateCategoryModal from "@/components/create-category-modal";
+import { getCategoryIcon } from "@/lib/icons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,14 +35,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-const iconMap = {
-  "shopping-cart": ShoppingCart,
-  "car": Car,
-  "file-text": FileText,
-  "zap": Zap,
-  "smile": Smile,
-};
 
 export default function ManageBudget() {
   const [, navigate] = useLocation();
@@ -78,6 +72,8 @@ export default function ManageBudget() {
   const [chartPeriod, setChartPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showResetAllocConfirm, setShowResetAllocConfirm] = useState(false);
+  const [isResettingAlloc, setIsResettingAlloc] = useState(false);
   const updateBudget = useUpdateBudget();
 
   const { data: expenses = [] } = useExpenses(budgetId || undefined);
@@ -177,7 +173,7 @@ export default function ManageBudget() {
   };
 
   const handleAddExtraIncome = async () => {
-    if (!budgetId) return;
+    let currentBudgetId = budgetId;
     const amount = parseFloat(extraIncome || "0");
     if (isNaN(amount) || amount <= 0) {
       toast({ title: "Error", description: "Enter a valid amount", variant: "destructive" });
@@ -185,26 +181,21 @@ export default function ManageBudget() {
     }
 
     try {
-      const current = summary?.monthlyBudget ?? 0;
-      const newTotal = current + amount;
-      await updateBudget.mutateAsync({ id: budgetId, data: { monthlyIncome: String(newTotal) } });
-      await storageService.createIncomeRecord({ budgetId, amount: String(amount), note: extraIncomeNote });
+      if (!currentBudgetId) {
+        const newBudget = await storageService.createBudget({
+          monthlyIncome: String(amount),
+          month: selectedMonth,
+        });
+        currentBudgetId = newBudget.id;
+      } else {
+        const current = summary?.monthlyBudget ?? 0;
+        const newTotal = current + amount;
+        await updateBudget.mutateAsync({ id: currentBudgetId, data: { monthlyIncome: String(newTotal) } });
+      }
 
-      queryClient.setQueryData(["budget", budgetId, "summary"], (old: any) => {
-        if (!old) return old;
-        const monthlyBudget = Number(old.monthlyBudget ?? 0) + amount;
-        const totalAllocated = old.totalAllocated ?? 0;
-        const totalSpent = old.totalSpent ?? 0;
-        const remainingBudget = monthlyBudget - totalAllocated;
-        return { ...old, monthlyBudget, totalAllocated, totalSpent, remainingBudget };
-      });
-      queryClient.setQueryData(["budget", budgetId], (old: any) => {
-        if (!old) return old;
-        return { ...old, monthlyIncome: String(Number(old.monthlyIncome ?? 0) + amount) };
-      });
+      await storageService.createIncomeRecord({ budgetId: currentBudgetId, amount: String(amount), note: extraIncomeNote });
 
-      queryClient.invalidateQueries({ queryKey: ["budget", budgetId, "summary"] });
-      queryClient.invalidateQueries({ queryKey: ["budget", budgetId] });
+      queryClient.invalidateQueries({ queryKey: ["budget"] });
       queryClient.invalidateQueries();
 
       toast({ title: "Success", description: `Added ${currency} ${amount.toLocaleString()} to monthly budget` });
@@ -221,10 +212,24 @@ export default function ManageBudget() {
   };
 
   const handleSave = async () => {
-    if (!budgetId) return;
+    let currentBudgetId = budgetId;
+    if (!currentBudgetId) {
+      try {
+        const newBudget = await storageService.createBudget({
+          monthlyIncome: "0",
+          month: selectedMonth,
+        });
+        currentBudgetId = newBudget.id;
+        queryClient.invalidateQueries({ queryKey: ["budget"] });
+      } catch (err) {
+        toast({ title: "Error", description: "Please set your monthly income first.", variant: "destructive" });
+        return;
+      }
+    }
+
     const totalAllocated = Object.values(localAlloc).reduce((sum, v) => sum + Number(v.allocatedAmount || 0), 0);
-    const monthlyBudget = summary?.monthlyBudget ?? Infinity;
-    if (totalAllocated > monthlyBudget) {
+    const monthlyBudget = summary?.monthlyBudget ?? 0;
+    if (monthlyBudget > 0 && totalAllocated > monthlyBudget) {
       toast({ title: "Error", description: "Total allocations exceed monthly budget", variant: "destructive" });
       return;
     }
@@ -242,32 +247,42 @@ export default function ManageBudget() {
           }
         } else {
           if (Number(amount) > 0) {
-            await storageService.createBudgetAllocation({ budgetId, categoryId, allocatedAmount: amount });
+            await storageService.createBudgetAllocation({ budgetId: currentBudgetId, categoryId, allocatedAmount: amount });
           }
         }
       }
 
-      const newAllocations: BudgetAllocation[] = Object.keys(localAlloc).map((categoryId) => {
-        const existing = allocations.find((a) => a.categoryId === categoryId);
-        return {
-          id: existing?.id ?? crypto.randomUUID(),
-          budgetId: budgetId,
-          categoryId,
-          allocatedAmount: localAlloc[categoryId].allocatedAmount,
-          createdAt: new Date(),
-        } as unknown as BudgetAllocation;
-      }).filter(a => Number(a.allocatedAmount) > 0);
-
-      queryClient.setQueryData(["allocations", budgetId], newAllocations);
-      queryClient.invalidateQueries({ queryKey: ["budget", budgetId, "summary"] });
-      queryClient.invalidateQueries({ queryKey: ["allocations", budgetId] });
-      queryClient.invalidateQueries({ queryKey: ["budget", budgetId, "categories-with-allocations"] });
-      queryClient.invalidateQueries({ queryKey: ["budget", budgetId, "expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["budget"] });
+      queryClient.invalidateQueries({ queryKey: ["allocations"] });
+      queryClient.invalidateQueries();
 
       toast({ title: "Success", description: "Allocations updated successfully" });
       navigate("/");
     } catch (error) {
       toast({ title: "Error", description: "Failed to update allocations", variant: "destructive" });
+    }
+  };
+
+  const handleResetAllocations = async () => {
+    if (!budgetId) return;
+    try {
+      setIsResettingAlloc(true);
+      await storageService.resetBudgetAllocations(budgetId);
+      const resetMap: Record<string, { id?: string; allocatedAmount: string }> = {};
+      categories.forEach((c) => {
+        resetMap[c.id] = { id: undefined, allocatedAmount: "0" };
+      });
+      setLocalAlloc(resetMap);
+      queryClient.setQueryData(["allocations", budgetId], []);
+      queryClient.invalidateQueries({ queryKey: ["allocations", budgetId] });
+      queryClient.invalidateQueries({ queryKey: ["budget", budgetId, "summary"] });
+      queryClient.invalidateQueries({ queryKey: ["budget", budgetId, "categories-with-allocations"] });
+      toast({ title: "Allocations Reset", description: "All category allocations for this month have been reset to zero." });
+      setShowResetAllocConfirm(false);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to reset allocations", variant: "destructive" });
+    } finally {
+      setIsResettingAlloc(false);
     }
   };
 
@@ -387,82 +402,92 @@ export default function ManageBudget() {
   }, [expenses]);
 
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-screen bg-background pb-20 w-full max-w-full overflow-x-hidden">
       {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-40">
-        <div className="max-w-2xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate("/")} data-testid="button-back">
+      <header className="bg-card/95 backdrop-blur-md border-b border-border/80 sticky top-0 z-40">
+        <div className="max-w-md mx-auto px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/")}
+                data-testid="button-back"
+                className="h-9 w-9 rounded-xl shrink-0"
+              >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <div>
-                <h1 className="font-semibold text-xl hidden sm:block">Manage Budget</h1>
-                <p className="text-sm text-muted-foreground hidden sm:block">Allocate your monthly budget</p>
+              <div className="min-w-0">
+                <h1 className="font-display font-bold text-base sm:text-lg tracking-tight truncate">
+                  Manage Budget
+                </h1>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  Allocations & categories
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-1.5 shrink-0">
               <MonthSelector
                 currentMonth={selectedMonth}
                 onMonthChange={setSelectedMonth}
               />
-
-              {currentMonthTransactions > 0 && budgetId && (
-                <ResetTransactionsModal
-                  budgetId={budgetId}
-                  transactionCount={currentMonthTransactions}
-                />
-              )}
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* Budget Summary Card */}
-        <Card className="border-2 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center space-x-2 text-lg">
-              <Wallet className="w-5 h-5 text-primary" />
-              <span>Budget Overview</span>
+      <div className="max-w-md mx-auto px-4 py-4 space-y-5 w-full overflow-x-hidden">
+        {/* Budget Overview Card */}
+        <Card className="rounded-3xl border border-border/80 shadow-sm overflow-hidden bg-card">
+          <CardHeader className="pb-2 p-4 sm:p-5 border-b border-border/40">
+            <CardTitle className="flex items-center justify-between text-base">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                  <Wallet className="w-4 h-4" />
+                </div>
+                <span className="font-display font-bold text-sm sm:text-base">Budget Overview</span>
+              </div>
+              <Badge variant={overBudget ? "destructive" : "secondary"} className="text-xs rounded-lg">
+                {allocationPercentage.toFixed(0)}% Allocated
+              </Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground mb-1">Monthly Budget</p>
-                <p className="text-lg font-bold text-primary">{currency} {monthlyBudget.toLocaleString()}</p>
+          <CardContent className="p-4 sm:p-5 space-y-3.5">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="p-2.5 rounded-2xl bg-muted/40 border border-border/40 text-center">
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Total Budget</p>
+                <p className="text-xs sm:text-sm font-bold text-primary mt-0.5 truncate tnum">
+                  {currency} {monthlyBudget.toLocaleString()}
+                </p>
               </div>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground mb-1">Allocated</p>
-                <p className={`text-lg font-bold ${overBudget ? 'text-destructive' : 'text-blue-500'}`}>
+              <div className="p-2.5 rounded-2xl bg-muted/40 border border-border/40 text-center">
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Allocated</p>
+                <p className={`text-xs sm:text-sm font-bold mt-0.5 truncate tnum ${overBudget ? 'text-rose-600 dark:text-rose-400' : 'text-blue-600 dark:text-blue-400'}`}>
                   {currency} {totalAllocated.toLocaleString()}
                 </p>
               </div>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground mb-1">Remaining</p>
-                <p className={`text-lg font-bold ${overBudget ? 'text-destructive' : 'text-green-500'}`}>
+              <div className="p-2.5 rounded-2xl bg-muted/40 border border-border/40 text-center">
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Remaining</p>
+                <p className={`text-xs sm:text-sm font-bold mt-0.5 truncate tnum ${overBudget ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   {currency} {remaining.toLocaleString()}
                 </p>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Allocation Progress</span>
-                <span className={`font-medium ${overBudget ? 'text-destructive' : ''}`}>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Allocation Progress</span>
+                <span className={`font-semibold tnum ${overBudget ? 'text-rose-600 dark:text-rose-400' : 'text-foreground'}`}>
                   {allocationPercentage.toFixed(1)}%
                 </span>
               </div>
-              <Progress value={allocationPercentage} className="h-2" />
+              <Progress value={Math.min(allocationPercentage, 100)} className="h-2 rounded-full" />
             </div>
 
             {overBudget && (
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
-                <p className="text-sm text-destructive font-medium">
-                  ⚠️ Total allocations exceed monthly budget by {currency} {(totalAllocated - monthlyBudget).toLocaleString()}
-                </p>
+              <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 text-xs text-rose-600 dark:text-rose-400">
+                ⚠️ Total allocations exceed monthly budget by {currency} {(totalAllocated - monthlyBudget).toLocaleString()}
               </div>
             )}
           </CardContent>
@@ -641,187 +666,192 @@ export default function ManageBudget() {
           </Card>
         )}
 
-        {/* Create Category Section */}
-        {showCreateCategory && (
-          <Card className="border-2 border-blue-200 bg-blue-50/50 dark:bg-blue-950/10">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Create New Category</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreateCategory} className="space-y-3">
-                <div>
-                  <Label htmlFor="categoryName">Category Name *</Label>
-                  <Input
-                    id="categoryName"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="e.g. Entertainment, Travel"
-                    data-testid="input-category-name"
-                    className="mt-1"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="categoryIcon">Icon *</Label>
-                  <Select value={newCategoryIcon} onValueChange={setNewCategoryIcon} required>
-                    <SelectTrigger data-testid="select-category-icon" className="mt-1">
-                      <SelectValue placeholder="Select an icon" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {iconOptions.map((option) => {
-                        const IconComponent = option.icon;
-                        return (
-                          <SelectItem key={option.value} value={option.value}>
-                            <div className="flex items-center space-x-2">
-                              <IconComponent className="w-4 h-4" />
-                              <span>{option.label}</span>
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="categoryColor">Color *</Label>
-                  <Select value={newCategoryColor} onValueChange={setNewCategoryColor} required>
-                    <SelectTrigger data-testid="select-category-color" className="mt-1">
-                      <SelectValue placeholder="Select a color" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {colorOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          <div className="flex items-center space-x-2">
-                            <div
-                              className="w-4 h-4 rounded-full border"
-                              style={{ backgroundColor: option.value }}
-                            ></div>
-                            <span>{option.label}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex space-x-2 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setShowCreateCategory(false);
-                      setNewCategoryName("");
-                      setNewCategoryIcon("");
-                      setNewCategoryColor("");
-                    }}
-                    className="flex-1"
-                    data-testid="button-cancel-category"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1"
-                    disabled={createCategoryMutation.isPending}
-                    data-testid="button-create-category"
-                  >
-                    {createCategoryMutation.isPending ? "Creating..." : "Create"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
+        {/* Create Category Modal */}
+        <CreateCategoryModal
+          open={showCreateCategory}
+          onOpenChange={setShowCreateCategory}
+          budgetId={budgetId}
+        />
 
         {/* Category Allocations */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Category Allocations</span>
-              <Badge variant="secondary">{categories.length} categories</Badge>
-            </CardTitle>
+        <Card className="rounded-3xl border border-border/80 shadow-sm overflow-hidden">
+          <CardHeader className="p-4 border-b border-border/40 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-display font-bold text-base truncate">
+                  Category Allocations
+                </span>
+                <Badge variant="secondary" className="rounded-md text-[11px] px-2 py-0.5 shrink-0">
+                  {categories.length}
+                </Badge>
+              </div>
+
+              <Button
+                size="sm"
+                onClick={() => setShowCreateCategory(true)}
+                className="text-xs h-8 px-3 rounded-xl font-medium shadow-sm shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                New Category
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/30">
+              <span className="text-[11px] text-muted-foreground truncate">
+                Set monthly limits per category
+              </span>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowResetAllocConfirm(true)}
+                className="text-xs h-7 px-2.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                disabled={!budgetId || isResettingAlloc}
+              >
+                <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                Reset Allocations
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-4 pt-3 sm:pt-4">
             {categories.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">No categories yet. Create your first category!</p>
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary mx-auto flex items-center justify-center mb-3">
+                  <FolderPlus className="w-6 h-6" />
+                </div>
+                <p className="font-medium text-sm">No categories configured</p>
+                <p className="text-xs text-muted-foreground mt-1 mb-4">
+                  Create your first budget category to start allocating funds.
+                </p>
                 <Button
-                  variant="outline"
                   onClick={() => setShowCreateCategory(true)}
+                  className="rounded-xl h-10 px-4 text-xs font-semibold"
                 >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
                   Create Category
                 </Button>
               </div>
             ) : (
-              <div className="space-y-4">
-                {categories.map((category, index) => {
-                  const allocated = Number(localAlloc[category.id]?.allocatedAmount || 0);
-                  const percentage = monthlyBudget > 0 ? (allocated / monthlyBudget) * 100 : 0;
-                  const IconComponent = iconMap[category.icon as keyof typeof iconMap] || Smile;
+              <div className="space-y-3">
+                {categories.map((category) => {
+                  const currentAllocVal = Number(localAlloc[category.id]?.allocatedAmount || 0);
+                  const percentage = monthlyBudget > 0 ? (currentAllocVal / monthlyBudget) * 100 : 0;
+                  const IconComponent = getCategoryIcon(category.icon);
+
+                  const bumpAlloc = (delta: number) => {
+                    const newVal = Math.max(0, currentAllocVal + delta);
+                    handleChange(category.id, String(newVal));
+                  };
 
                   return (
-                    <div key={category.id}>
-                      {index > 0 && <Separator className="my-4" />}
-                      <div className="space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div
-                              className="w-10 h-10 rounded-lg flex items-center justify-center"
-                              style={{ backgroundColor: `${category.color}20` }}
-                            >
-                              <IconComponent className="w-5 h-5" style={{ color: category.color }} />
-                            </div>
-                            <div>
-                              <p className="font-medium">{category.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {percentage > 0 ? `${percentage.toFixed(1)}% of budget` : 'Not allocated'}
-                              </p>
-                            </div>
+                    <div
+                      key={category.id}
+                      className="p-3 sm:p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/30 transition-all space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center space-x-2.5 min-w-0">
+                          <div
+                            className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm"
+                            style={{
+                              backgroundColor: `${category.color}1c`,
+                              color: category.color,
+                            }}
+                          >
+                            <IconComponent className="w-5 h-5" />
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <div className="w-32">
-                              <Label htmlFor={`alloc-${category.id}`} className="sr-only">
-                                Allocation for {category.name}
-                              </Label>
-                              <Input
-                                id={`alloc-${category.id}`}
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={localAlloc[category.id]?.allocatedAmount ?? "0"}
-                                onChange={(e) => handleChange(category.id, e.target.value)}
-                                data-testid={`input-alloc-${category.id}`}
-                                className="text-right font-medium"
-                                placeholder="0"
-                              />
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setCategoryToDelete(category);
-                                setShowDeleteConfirm(true);
-                              }}
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              data-testid={`button-delete-category-${category.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                          <div className="min-w-0">
+                            <p className="font-display font-semibold truncate text-sm">
+                              {category.name}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground tnum truncate">
+                              {percentage > 0 ? `${percentage.toFixed(1)}% of budget` : "Not allocated"}
+                            </p>
                           </div>
                         </div>
-                        {allocated > 0 && (
-                          <Progress
-                            value={Math.min(percentage, 100)}
-                            className="h-1.5"
-                            style={{
-                              // @ts-ignore
-                              '--progress-background': category.color
+
+                        <div className="flex items-center space-x-1.5 shrink-0">
+                          <div className="relative w-28 sm:w-32">
+                            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-semibold">
+                              {currency}
+                            </div>
+                            <Input
+                              id={`alloc-${category.id}`}
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={localAlloc[category.id]?.allocatedAmount ?? "0"}
+                              onChange={(e) => handleChange(category.id, e.target.value)}
+                              data-testid={`input-alloc-${category.id}`}
+                              className="text-right font-semibold text-xs sm:text-sm pl-8 pr-2 h-9 rounded-xl"
+                              placeholder="0"
+                            />
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setCategoryToDelete(category);
+                              setShowDeleteConfirm(true);
                             }}
-                          />
+                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-9 w-9 rounded-xl shrink-0"
+                            title="Delete category"
+                            data-testid={`button-delete-category-${category.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Quick Increment Chips */}
+                      <div className="flex items-center justify-between gap-1 pt-0.5">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-[10px] text-muted-foreground mr-0.5">Quick +:</span>
+                          <button
+                            type="button"
+                            onClick={() => bumpAlloc(500)}
+                            className="text-[11px] px-2 py-0.5 rounded-lg bg-muted/60 hover:bg-muted font-medium transition-all active:scale-95"
+                          >
+                            +500
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => bumpAlloc(1000)}
+                            className="text-[11px] px-2 py-0.5 rounded-lg bg-muted/60 hover:bg-muted font-medium transition-all active:scale-95"
+                          >
+                            +1k
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => bumpAlloc(5000)}
+                            className="text-[11px] px-2 py-0.5 rounded-lg bg-muted/60 hover:bg-muted font-medium transition-all active:scale-95"
+                          >
+                            +5k
+                          </button>
+                        </div>
+
+                        {currentAllocVal > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleChange(category.id, "0")}
+                            className="text-[10px] text-muted-foreground hover:text-destructive font-medium transition-colors"
+                          >
+                            Clear
+                          </button>
                         )}
                       </div>
+
+                      {currentAllocVal > 0 && (
+                        <div className="w-full bg-muted/80 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-300"
+                            style={{
+                              width: `${Math.min(percentage, 100)}%`,
+                              backgroundColor: category.color,
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -830,14 +860,41 @@ export default function ManageBudget() {
           </CardContent>
         </Card>
 
+        {/* Reset Transactions Section (Only if transactions exist for month) */}
+        {currentMonthTransactions > 0 && budgetId && (
+          <div className="p-3.5 rounded-2xl bg-card border border-border/80 shadow-sm flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-semibold text-xs sm:text-sm">
+                Transactions ({currentMonthTransactions})
+              </p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                Expenses recorded in this month
+              </p>
+            </div>
+            <ResetTransactionsModal
+              budgetId={budgetId}
+              transactionCount={currentMonthTransactions}
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2.5 rounded-xl text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 border-rose-200 dark:border-rose-900/40 shrink-0 font-medium"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                Reset Txns
+              </Button>
+            </ResetTransactionsModal>
+          </div>
+        )}
+
         {/* Action Buttons */}
-        <div className="sticky bottom-0 bg-background pt-4 pb-2 border-t">
-          <div className="flex space-x-3">
+        <div className="sticky bottom-0 bg-background/95 backdrop-blur-md pt-3 pb-4 border-t border-border/80 -mx-4 px-4 z-30">
+          <div className="max-w-md mx-auto flex gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={() => navigate("/")}
-              className="flex-1"
+              className="flex-1 h-12 rounded-2xl"
               size="lg"
             >
               Cancel
@@ -846,7 +903,7 @@ export default function ManageBudget() {
               type="button"
               onClick={handleSave}
               disabled={overBudget}
-              className="flex-1"
+              className="flex-1 h-12 rounded-2xl font-semibold shadow-md active:scale-98"
               size="lg"
             >
               Save Allocations
@@ -880,6 +937,29 @@ export default function ManageBudget() {
               disabled={deleteCategoryMutation.isPending}
             >
               {deleteCategoryMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset Monthly Allocations Confirmation Dialog */}
+      <AlertDialog open={showResetAllocConfirm} onOpenChange={setShowResetAllocConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Monthly Allocations?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will set all category allocations for this month to zero ({currency} 0).
+              Your recorded transactions, categories, and monthly income will remain intact.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isResettingAlloc}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetAllocations}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={isResettingAlloc}
+            >
+              {isResettingAlloc ? "Resetting..." : "Yes, Reset Allocations"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
