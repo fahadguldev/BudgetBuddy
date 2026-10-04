@@ -18,30 +18,14 @@ import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import { ProtectedRoute } from "@/components/protected-route";
 import { AuthProvider, useAuth } from "@/context/auth-context";
-import { Cloud, LogIn, HardDrive } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { Link } from "wouter";
 
 function AuthStatusBar() {
   const { user, isConfigured } = useAuth();
 
-  if (!isConfigured) {
-    return (
-      <Badge variant="outline" className="text-[10px] gap-1 py-0.5 border-dashed">
-        <HardDrive className="w-3 h-3 text-muted-foreground" />
-        Local Mode
-      </Badge>
-    );
-  }
-
-  if (user) {
-    return (
-      <Link href="/settings">
-        <Badge variant="outline" className="text-[10px] gap-1 py-0.5 cursor-pointer bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 hover:opacity-80">
-          <Cloud className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-          {user.displayName?.split(" ")[0] || "Synced"}
-        </Badge>
-      </Link>
-    );
+  if (!isConfigured || user) {
+    return null;
   }
 
   return (
