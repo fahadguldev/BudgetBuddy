@@ -45,18 +45,19 @@ export default function MonthSelector({ currentMonth, onMonthChange, className =
     };
 
     return (
-        <div className={`flex items-center space-x-2 ${className}`}>
+        <div className={`flex items-center gap-1 ${className}`}>
             <Button
                 variant="ghost"
                 size="icon"
                 onClick={handlePrevious}
-                className="h-8 w-8"
+                aria-label="Previous month"
+                className="h-11 w-11 rounded-xl"
             >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-5 w-5" />
             </Button>
 
             <Select value={currentMonth} onValueChange={onMonthChange}>
-                <SelectTrigger className="w-[180px] h-8">
+                <SelectTrigger className="w-[160px] h-11 rounded-xl text-sm font-medium" aria-label="Select month">
                     <SelectValue placeholder="Select month">
                         {format(parseISO(currentMonth + "-01"), "MMMM yyyy")}
                     </SelectValue>
@@ -81,9 +82,10 @@ export default function MonthSelector({ currentMonth, onMonthChange, className =
                 size="icon"
                 onClick={handleNext}
                 disabled={isNextDisabled()}
-                className="h-8 w-8"
+                aria-label="Next month"
+                className="h-11 w-11 rounded-xl"
             >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-5 w-5" />
             </Button>
         </div>
     );
