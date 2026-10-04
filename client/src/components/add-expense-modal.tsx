@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 // Currency symbol replaced inline with 'PKR'
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateExpense } from "@/hooks/use-expenses";
-import { useQuery } from "@tanstack/react-query";
-import { useCategoriesWithAllocations } from "@/hooks/use-expenses";
+import { useCategoriesWithAllocations, useCategories } from "@/hooks/use-expenses";
 import { useToast } from "@/hooks/use-toast";
-import { storageService } from "@/lib/storage";
-import { type Category } from "@/types";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useSettings } from "@/hooks/use-settings";
+import { getCategoryIcon } from "@/lib/icons";
 
 interface AddExpenseModalProps {
   open: boolean;
@@ -19,7 +19,7 @@ interface AddExpenseModalProps {
   budgetId: string;
 }
 
-export default function AddExpenseModal({ open, onOpenChange, budgetId }: AddExpenseModalProps) {
+function ExpenseForm({ budgetId, onDone }: { budgetId: string; onDone: () => void }) {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -30,11 +30,15 @@ export default function AddExpenseModal({ open, onOpenChange, budgetId }: AddExp
   const { toast } = useToast();
   const createExpense = useCreateExpense();
 
-  // Prefer categories that belong to this budget and have allocations
+  // Categories for this budget
   const { data: categoriesWithAllocations = [] } = useCategoriesWithAllocations(budgetId);
+  const { data: allCategories = [] } = useCategories();
 
-  // Only show categories that have an allocated amount > 0
-  const availableCategories = categoriesWithAllocations.filter((c) => (c.allocated ?? 0) > 0);
+  // If some categories have positive allocations, show those; otherwise show all categories
+  const hasAllocations = categoriesWithAllocations.some((c) => (c.allocated ?? 0) > 0);
+  const availableCategories = hasAllocations
+    ? categoriesWithAllocations.filter((c) => (c.allocated ?? 0) > 0)
+    : allCategories;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,7 +73,7 @@ export default function AddExpenseModal({ open, onOpenChange, budgetId }: AddExp
       setDescription("");
       setCategoryId("");
       setDate(new Date().toISOString().slice(0, 10));
-      onOpenChange(false);
+      onDone();
     } catch (error) {
       toast({
         title: "Error",
@@ -80,90 +84,126 @@ export default function AddExpenseModal({ open, onOpenChange, budgetId }: AddExp
   };
 
   return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="amount">Amount *</Label>
+        <div className="relative mt-1.5">
+          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">{`${currency}\u00A0`}</span>
+          <Input
+            id="amount"
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            placeholder="0.00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="pl-12 h-12 text-lg tnum rounded-xl"
+            data-testid="input-amount"
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="category">Category *</Label>
+        <Select value={categoryId} onValueChange={setCategoryId} required>
+          <SelectTrigger data-testid="select-category" className="mt-1.5 h-12 rounded-xl">
+            <SelectValue placeholder="Select a category" />
+          </SelectTrigger>
+          <SelectContent>
+            {availableCategories.map((category) => {
+              const CatIcon = getCategoryIcon(category.icon);
+              return (
+                <SelectItem key={category.id} value={category.id}>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: `${category.color}22`, color: category.color }}
+                    >
+                      <CatIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <span>{category.name}</span>
+                  </div>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label htmlFor="description">Description (optional)</Label>
+        <Input
+          id="description"
+          type="text"
+          placeholder="What did you spend on?"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="mt-1.5 h-12 rounded-xl"
+          data-testid="input-description"
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="date">Date</Label>
+        <Input
+          id="date"
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="mt-1.5 h-12 rounded-xl"
+          data-testid="input-date"
+        />
+      </div>
+
+      <div className="flex gap-3 pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onDone}
+          className="flex-1 h-12 rounded-xl"
+          data-testid="button-cancel"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          className="flex-1 h-12 rounded-xl font-semibold"
+          disabled={createExpense.isPending}
+          data-testid="button-add-expense"
+        >
+          {createExpense.isPending ? "Adding..." : "Add Expense"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+export default function AddExpenseModal({ open, onOpenChange, budgetId }: AddExpenseModalProps) {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={onOpenChange}>
+        <DrawerContent className="pb-safe" data-testid="add-expense-modal">
+          <DrawerHeader className="text-left">
+            <DrawerTitle className="font-display font-bold tracking-tight">Add Expense</DrawerTitle>
+          </DrawerHeader>
+          <div className="px-4 pb-6">
+            <ExpenseForm budgetId={budgetId} onDone={() => onOpenChange(false)} />
+          </div>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md slide-up" data-testid="add-expense-modal">
+      <DialogContent className="max-w-md rounded-2xl" data-testid="add-expense-modal">
         <DialogHeader>
-          <DialogTitle>Add Expense</DialogTitle>
+          <DialogTitle className="font-display font-bold tracking-tight">Add Expense</DialogTitle>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="amount">Amount *</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">{`${currency}\u00A0`}</span>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="pl-12"
-                data-testid="input-amount"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="category">Category *</Label>
-            <Select value={categoryId} onValueChange={setCategoryId} required>
-              <SelectTrigger data-testid="select-category">
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableCategories.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="description">Description (optional)</Label>
-            <Input
-              id="description"
-              type="text"
-              placeholder="What did you spend on?"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              data-testid="input-description"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="date">Date</Label>
-            <Input
-              id="date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              data-testid="input-date"
-            />
-          </div>
-
-          <div className="flex space-x-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="flex-1"
-              data-testid="button-cancel"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="flex-1"
-              disabled={createExpense.isPending}
-              data-testid="button-add-expense"
-            >
-              {createExpense.isPending ? "Adding..." : "Add Expense"}
-            </Button>
-          </div>
-        </form>
+        <ExpenseForm budgetId={budgetId} onDone={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );
