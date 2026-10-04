@@ -113,7 +113,7 @@ export default function SpendingChart({ expenses, isLoading }: SpendingChartProp
 
   if (isLoading) {
     return (
-      <Card className="border-0 shadow-md">
+      <Card className="rounded-2xl border-0 shadow-md">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <Skeleton className="h-5 w-32" />
@@ -133,21 +133,21 @@ export default function SpendingChart({ expenses, isLoading }: SpendingChartProp
   }
 
   return (
-    <Card className="border-0 shadow-md" data-testid="spending-chart">
+    <Card className="rounded-2xl border-0 shadow-md overflow-hidden max-w-full" data-testid="spending-chart">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <CardTitle className="text-base font-semibold">Spending Overview</CardTitle>
+          <CardTitle className="font-display text-base font-bold tracking-tight">Spending Overview</CardTitle>
 
           {/* Period Selector - Mobile Optimized */}
           <Tabs value={period} onValueChange={(v) => setPeriod(v as ChartPeriod)} className="w-auto">
-            <TabsList className="h-9 p-1 bg-muted/50">
-              <TabsTrigger value="day" className="text-xs px-3 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsList className="h-11 p-1 bg-muted/50 rounded-xl">
+              <TabsTrigger value="day" className="text-xs px-4 min-h-[36px] rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Day
               </TabsTrigger>
-              <TabsTrigger value="week" className="text-xs px-3 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="week" className="text-xs px-4 min-h-[36px] rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Week
               </TabsTrigger>
-              <TabsTrigger value="month" className="text-xs px-3 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="month" className="text-xs px-4 min-h-[36px] rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Month
               </TabsTrigger>
             </TabsList>
@@ -155,7 +155,7 @@ export default function SpendingChart({ expenses, isLoading }: SpendingChartProp
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="overflow-hidden">
         {chartData.length === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">
             No spending data for this period
@@ -163,16 +163,16 @@ export default function SpendingChart({ expenses, isLoading }: SpendingChartProp
         ) : (
           <>
             {/* Chart */}
-            <div className="w-full" style={{ touchAction: 'pan-y' }}>
+            <div className="w-full max-w-full overflow-hidden" style={{ touchAction: 'pan-y' }}>
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart
                   data={chartData}
-                  margin={{ top: 10, right: 10, left: -20, bottom: 5 }}
+                  margin={{ top: 10, right: 10, left: -10, bottom: 5 }}
                 >
                   <defs>
                     <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid
@@ -183,14 +183,14 @@ export default function SpendingChart({ expenses, isLoading }: SpendingChartProp
                   />
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 11, fill: '#6b7280' }}
+                    tick={{ fontSize: 12, fill: '#6b7280' }}
                     tickLine={false}
                     axisLine={{ stroke: '#e5e7eb' }}
                     height={30}
                     interval={period === "month" ? Math.floor(chartData.length / 6) : 0}
                   />
                   <YAxis
-                    tick={{ fontSize: 10, fill: '#6b7280' }}
+                    tick={{ fontSize: 11, fill: '#6b7280' }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(value) => value === 0 ? '0' : `${(value / 1000).toFixed(0)}k`}
@@ -223,18 +223,18 @@ export default function SpendingChart({ expenses, isLoading }: SpendingChartProp
                   <Line
                     type="monotone"
                     dataKey="amount"
-                    stroke="#3B82F6"
+                    stroke="#10b981"
                     strokeWidth={3}
                     fill="url(#colorAmount)"
                     dot={{
-                      fill: '#3B82F6',
+                      fill: '#10b981',
                       strokeWidth: 2,
                       r: 4,
                       stroke: '#ffffff'
                     }}
                     activeDot={{
                       r: 6,
-                      fill: '#3B82F6',
+                      fill: '#10b981',
                       stroke: '#ffffff',
                       strokeWidth: 2
                     }}
@@ -246,25 +246,25 @@ export default function SpendingChart({ expenses, isLoading }: SpendingChartProp
             {/* Stats Grid - Mobile Optimized */}
             <div className="grid grid-cols-3 gap-2 mt-4">
               {/* Total */}
-              <div className="bg-muted/30 rounded-lg p-3 border border-border/50">
+              <div className="bg-muted/30 rounded-xl p-3 border border-border/50">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Total</p>
-                <p className="text-sm font-bold leading-tight">
+                <p className="font-display text-sm font-bold leading-tight tnum">
                   {currency} {stats.total.toLocaleString()}
                 </p>
               </div>
 
               {/* Average */}
-              <div className="bg-muted/30 rounded-lg p-3 border border-border/50">
+              <div className="bg-muted/30 rounded-xl p-3 border border-border/50">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Average</p>
-                <p className="text-sm font-bold leading-tight">
+                <p className="font-display text-sm font-bold leading-tight tnum">
                   {currency} {Math.round(stats.average).toLocaleString()}
                 </p>
               </div>
 
               {/* Highest */}
-              <div className="bg-muted/30 rounded-lg p-3 border border-border/50">
+              <div className="bg-muted/30 rounded-xl p-3 border border-border/50">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Highest</p>
-                <p className="text-sm font-bold leading-tight text-primary">
+                <p className="font-display text-sm font-bold leading-tight tnum text-primary">
                   {currency} {stats.highest.toLocaleString()}
                 </p>
               </div>

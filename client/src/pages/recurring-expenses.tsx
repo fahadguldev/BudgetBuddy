@@ -46,14 +46,16 @@ export default function RecurringExpenses() {
 
 
     return (
-        <div className="min-h-screen bg-background pb-20">
-            <header className="bg-card border-b border-border sticky top-0 z-40">
-                <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+        <div className="min-h-screen bg-background pb-28 w-full max-w-full overflow-x-hidden">
+            <header className="bg-card/95 backdrop-blur border-b border-border sticky top-0 z-40">
+                <div className="max-w-md md:max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                         <Link href="/">
-                            <ArrowLeft className="w-6 h-6 cursor-pointer" />
+                            <Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl" aria-label="Back to dashboard">
+                                <ArrowLeft className="w-5 h-5 cursor-pointer" />
+                            </Button>
                         </Link>
-                        <h1 className="font-semibold text-lg">Recurring Expenses</h1>
+                        <h1 className="font-display font-bold text-lg tracking-tight">Recurring Expenses</h1>
                     </div>
                     <Dialog open={isOpen} onOpenChange={setIsOpen}>
                         <DialogTrigger asChild>
@@ -120,16 +122,16 @@ export default function RecurringExpenses() {
                 </div>
             </header>
 
-            <div className="max-w-md mx-auto px-4 mt-6 space-y-4">
+            <div className="max-w-md md:max-w-4xl mx-auto px-4 mt-6 space-y-4">
                 {recurringExpenses.length === 0 ? (
-                    <Card>
+                    <Card className="rounded-2xl">
                         <CardContent className="pt-6 text-center text-muted-foreground">
                             No recurring expenses set up.
                         </CardContent>
                     </Card>
                 ) : (
                     recurringExpenses.map((expense) => (
-                        <Card key={expense.id}>
+                        <Card key={expense.id} className="rounded-2xl hover:shadow-md transition-shadow">
                             <CardContent className="p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { storageService } from "@/lib/storage";
 import { useExpenses, useDeleteExpense } from "@/hooks/use-expenses";
@@ -22,14 +23,8 @@ import {
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, subWeeks, parseISO } from "date-fns";
 import MonthSelector from "@/components/month-selector";
-
-const iconMap = {
-  "shopping-cart": ShoppingCart,
-  "car": Car,
-  "file-text": FileText,
-  "zap": Zap,
-  "smile": Smile,
-};
+import BottomNavigation from "@/components/bottom-navigation";
+import { getCategoryIcon } from "@/lib/icons";
 
 export default function Transactions() {
   const [, navigate] = useLocation();
@@ -213,16 +208,16 @@ export default function Transactions() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-screen bg-background pb-28 w-full max-w-full overflow-x-hidden">
       {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate("/")} data-testid="button-back">
+      <header className="bg-card/95 backdrop-blur border-b border-border sticky top-0 z-40">
+        <div className="max-w-md md:max-w-4xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={() => navigate("/")} data-testid="button-back" aria-label="Back to dashboard" className="h-11 w-11 rounded-xl">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <h1 className="font-semibold text-xl hidden sm:block">Transactions</h1>
+              <h1 className="font-display font-bold text-lg tracking-tight">Transactions</h1>
             </div>
 
             <MonthSelector
@@ -233,22 +228,22 @@ export default function Transactions() {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-md md:max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* Stats Summary */}
         <div className="grid grid-cols-2 gap-3">
-          <Card>
+          <Card className="rounded-2xl">
             <CardContent className="pt-4 pb-4">
               <div className="text-center">
                 <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Transactions</p>
-                <p className="text-xl sm:text-2xl font-bold text-primary">{transactionCount}</p>
+                <p className="font-display text-xl sm:text-2xl font-bold tnum text-primary">{transactionCount}</p>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="rounded-2xl">
             <CardContent className="pt-4 pb-4">
               <div className="text-center">
                 <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">Total Spent</p>
-                <p className="text-xl sm:text-2xl font-bold text-destructive">{currency} {totalAmount.toLocaleString()}</p>
+                <p className="font-display text-xl sm:text-2xl font-bold tnum text-destructive">{currency} {totalAmount.toLocaleString()}</p>
               </div>
             </CardContent>
           </Card>
@@ -256,18 +251,18 @@ export default function Transactions() {
 
         {/* Spending Trends Chart */}
         {currentMonthExpenses.length > 0 && categories.length > 0 && (
-          <Card>
+          <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
                 <div className="flex items-center space-x-2">
                   <TrendingUp className="w-4 h-4 text-primary flex-shrink-0" />
-                  <CardTitle className="text-base sm:text-lg">Spending Trends</CardTitle>
+                  <CardTitle className="font-display text-base sm:text-lg font-bold tracking-tight">Spending Trends</CardTitle>
                 </div>
                 <Tabs value={chartPeriod} onValueChange={(v) => setChartPeriod(v as typeof chartPeriod)} className="w-full sm:w-auto">
-                  <TabsList className="h-8 p-0.5 bg-muted/50 w-full sm:w-auto">
-                    <TabsTrigger value="day" className="text-[10px] sm:text-xs px-2 py-1 flex-1 sm:flex-none">Daily</TabsTrigger>
-                    <TabsTrigger value="week" className="text-[10px] sm:text-xs px-2 py-1 flex-1 sm:flex-none">Weekly</TabsTrigger>
-                    <TabsTrigger value="month" className="text-[10px] sm:text-xs px-2 py-1 flex-1 sm:flex-none">Monthly</TabsTrigger>
+                  <TabsList className="h-10 p-1 bg-muted/50 w-full sm:w-auto rounded-xl">
+                    <TabsTrigger value="day" className="text-[10px] sm:text-xs px-2 py-1 min-h-[32px] flex-1 sm:flex-none rounded-lg">Daily</TabsTrigger>
+                    <TabsTrigger value="week" className="text-[10px] sm:text-xs px-2 py-1 min-h-[32px] flex-1 sm:flex-none rounded-lg">Weekly</TabsTrigger>
+                    <TabsTrigger value="month" className="text-[10px] sm:text-xs px-2 py-1 min-h-[32px] flex-1 sm:flex-none rounded-lg">Monthly</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
@@ -349,7 +344,7 @@ export default function Transactions() {
         )}
 
         {/* Category Filter Chips */}
-        <Card>
+        <Card className="rounded-2xl">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-1.5">
@@ -372,20 +367,20 @@ export default function Transactions() {
             <div className="flex flex-wrap gap-1.5 sm:gap-2">
               <Badge
                 variant={!selectedCategoryId ? "default" : "outline"}
-                className="cursor-pointer px-2 py-1 text-[10px] sm:text-xs"
+                className="cursor-pointer px-2.5 min-h-[36px] inline-flex items-center text-[10px] sm:text-xs rounded-full"
                 onClick={() => setSelectedCategoryId(null)}
               >
                 All ({currentMonthExpenses.length})
               </Badge>
               {categoryStats.map(({ categoryId, count, total, category }) => {
-                const IconComponent = category ? iconMap[category.icon as keyof typeof iconMap] || Smile : Smile;
+                const IconComponent = getCategoryIcon(category?.icon);
                 const isSelected = selectedCategoryId === categoryId;
 
                 return (
                   <Badge
                     key={categoryId}
                     variant={isSelected ? "default" : "outline"}
-                    className="cursor-pointer px-2 py-1 text-[10px] sm:text-xs flex items-center space-x-1"
+                    className="cursor-pointer px-2.5 min-h-[36px] inline-flex items-center gap-1 text-[10px] sm:text-xs rounded-full"
                     onClick={() => setSelectedCategoryId(categoryId === selectedCategoryId ? null : categoryId)}
                     style={isSelected && category ? { backgroundColor: category.color, borderColor: category.color } : {}}
                   >
@@ -410,7 +405,7 @@ export default function Transactions() {
           </div>
 
           <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
-            <SelectTrigger className="w-full sm:w-[160px] h-8 text-xs">
+            <SelectTrigger className="w-full sm:w-[160px] h-11 rounded-xl text-xs" aria-label="Sort transactions">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
@@ -424,11 +419,11 @@ export default function Transactions() {
 
         {/* Transactions List */}
         {isLoading ? (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center text-sm text-muted-foreground">Loading transactions…</div>
-            </CardContent>
-          </Card>
+          <div className="space-y-2 sm:space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-20 w-full rounded-2xl" />
+            ))}
+          </div>
         ) : sortedExpenses.length === 0 ? (
           <Card>
             <CardContent className="pt-6">
@@ -456,36 +451,36 @@ export default function Transactions() {
           <div className="space-y-2 sm:space-y-3">
             {sortedExpenses.map((tx, index) => {
               const category = findCategory(tx.categoryId);
-              const IconComponent = category ? iconMap[category.icon as keyof typeof iconMap] || Smile : Smile;
+              const IconComponent = getCategoryIcon(category?.icon);
 
               return (
-                <Card key={tx.id} className="hover:shadow-md transition-shadow">
+                <Card key={tx.id} className="rounded-2xl hover:shadow-md transition-shadow">
                   <CardContent className="p-3 sm:p-4">
                     <div className="flex items-start justify-between gap-2 sm:gap-4">
                       {/* Left side - Icon and Details */}
-                      <div className="flex items-start space-x-2 sm:space-x-3 flex-1 min-w-0">
+                      <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
                         <div
-                          className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                           style={{ backgroundColor: category ? `${category.color}20` : '#e5e7eb' }}
                         >
                           {category ? (
-                            <IconComponent className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: category.color }} />
+                            <IconComponent className="w-5 h-5" style={{ color: category.color }} />
                           ) : (
-                            <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
+                            <DollarSign className="w-5 h-5 text-gray-500" />
                           )}
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-xs sm:text-sm mb-0.5">{findCategoryName(tx.categoryId)}</h3>
+                          <h3 className="font-medium text-sm mb-0.5 truncate">{findCategoryName(tx.categoryId)}</h3>
 
                           {tx.description && (
-                            <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 break-words line-clamp-2">
+                            <p className="text-xs text-muted-foreground mb-1 break-words line-clamp-2">
                               {tx.description}
                             </p>
                           )}
 
-                          <div className="flex items-center space-x-1.5 text-[9px] sm:text-xs text-muted-foreground">
-                            <Calendar className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                          <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-muted-foreground">
+                            <Calendar className="w-3 h-3" />
                             <span>{new Date(tx.date).toLocaleString('en-US', {
                               month: 'short',
                               day: 'numeric',
@@ -497,19 +492,20 @@ export default function Transactions() {
                       </div>
 
                       {/* Right side - Amount and Actions */}
-                      <div className="flex flex-col items-end space-y-1.5 flex-shrink-0">
-                        <div className="font-bold text-xs sm:text-sm text-destructive whitespace-nowrap">
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <div className="font-display font-bold text-sm tnum text-destructive whitespace-nowrap">
                           -{currency} {Number(tx.amount).toLocaleString()}
                         </div>
 
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 sm:h-7 px-1.5 sm:px-2 text-[10px] sm:text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                          className="min-h-[44px] min-w-[44px] px-2.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
                           onClick={() => handleDelete(tx.id)}
                           disabled={deleteMutation.isPending}
+                          aria-label={`Delete transaction ${findCategoryName(tx.categoryId)} ${currency} ${Number(tx.amount).toLocaleString()}`}
                         >
-                          <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                          <Trash2 className="w-4 h-4" />
                           <span className="hidden sm:inline ml-1">Delete</span>
                         </Button>
                       </div>
@@ -521,6 +517,8 @@ export default function Transactions() {
           </div>
         )}
       </div>
+
+      <BottomNavigation />
     </div>
   );
 }

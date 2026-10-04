@@ -60,7 +60,7 @@ export default function InstallButton() {
 
   return (
     <div>
-      <button onClick={handleInstall} className="p-2 rounded bg-green-500 text-white">
+      <button onClick={handleInstall} className="inline-flex items-center h-9 px-4 rounded-full bg-primary text-primary-foreground text-sm font-medium shadow-sm transition-all hover:shadow-md active:scale-95">
         Install BudgetBuddy
       </button>
       {/* Manual trigger note (dev): you can also run `window.deferredPrompt && window.deferredPrompt.prompt()` in the browser Console */}

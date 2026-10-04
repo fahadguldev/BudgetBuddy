@@ -13,7 +13,7 @@ export default defineConfig({
         name: 'BudgetBuddy',
         short_name: 'BudgetBuddy',
         description: 'Your personal finance companion',
-        theme_color: '#ffffff',
+        theme_color: '#10b981',
         icons: [
           {
             src: 'icons/icon-192x192.png',
@@ -35,6 +35,7 @@ export default defineConfig({
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
+  envDir: path.resolve(import.meta.dirname),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,

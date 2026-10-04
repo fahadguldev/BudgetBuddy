@@ -65,6 +65,7 @@ export function MonthlyIncomeModal({ isOpen, currentMonth, onComplete }: Monthly
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setValidationError("");
+        console.log("MonthlyIncomeModal: Submitting income...");
 
         const incomeAmount = parseFloat(income);
         if (!income || incomeAmount <= 0) {
@@ -107,15 +108,16 @@ export function MonthlyIncomeModal({ isOpen, currentMonth, onComplete }: Monthly
 
         // Create budget with rollover
         try {
+            console.log("MonthlyIncomeModal: Creating budget in storage...");
             const newBudget = await storageService.createBudgetWithRollover({
                 monthlyIncome: income,
                 month: currentMonth,
                 includeRollover: rolloverChoice === 'yes',
             });
+            console.log("MonthlyIncomeModal: Budget created successfully", newBudget);
 
             // If same or more income, copy previous allocations
             if (previousAllocated > 0 && totalAvailable >= previousAllocated) {
-                // Get previous month
                 const [year, monthNum] = currentMonth.split('-').map(Number);
                 const prevDate = new Date(year, monthNum - 2, 1);
                 const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
@@ -131,6 +133,7 @@ export function MonthlyIncomeModal({ isOpen, currentMonth, onComplete }: Monthly
                 description: `Your budget for ${monthDisplay} has been set up successfully!`,
             });
 
+            console.log("MonthlyIncomeModal: Calling onComplete...");
             onComplete();
         } catch (error) {
             console.error("Failed to create budget:", error);
@@ -147,9 +150,9 @@ export function MonthlyIncomeModal({ isOpen, currentMonth, onComplete }: Monthly
 
     return (
         <Dialog open={isOpen} onOpenChange={() => { }}>
-            <DialogContent className="sm:max-w-[500px]" onPointerDownOutside={(e) => e.preventDefault()}>
+            <DialogContent className="sm:max-w-[500px] rounded-2xl max-sm:rounded-t-3xl" onPointerDownOutside={(e) => e.preventDefault()}>
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
+                    <DialogTitle className="font-display font-bold tracking-tight flex items-center gap-2">
                         <DollarSign className="h-5 w-5" />
                         Set Income for {monthDisplay}
                     </DialogTitle>
@@ -180,18 +183,16 @@ export function MonthlyIncomeModal({ isOpen, currentMonth, onComplete }: Monthly
                                             <div className="flex gap-2 mt-2">
                                                 <Button
                                                     type="button"
-                                                    size="sm"
                                                     onClick={() => setRolloverChoice('yes')}
-                                                    className="bg-green-600 hover:bg-green-700 text-white"
+                                                    className="h-11 rounded-xl bg-green-600 hover:bg-green-700 text-white"
                                                 >
                                                     Yes, Add to Income
                                                 </Button>
                                                 <Button
                                                     type="button"
-                                                    size="sm"
                                                     variant="outline"
                                                     onClick={() => setRolloverChoice('no')}
-                                                    className="border-gray-300 hover:bg-gray-100"
+                                                    className="h-11 rounded-xl border-gray-300 hover:bg-gray-100"
                                                 >
                                                     No, Start Fresh
                                                 </Button>
@@ -252,10 +253,11 @@ export function MonthlyIncomeModal({ isOpen, currentMonth, onComplete }: Monthly
                                 <Input
                                     id="income"
                                     type="number"
+                                    inputMode="decimal"
                                     placeholder="50000"
                                     value={income}
                                     onChange={(e) => setIncome(e.target.value)}
-                                    className="pl-14"
+                                    className="pl-14 h-12 text-lg tnum rounded-xl"
                                     min="0"
                                     step="0.01"
                                     required
@@ -301,8 +303,8 @@ export function MonthlyIncomeModal({ isOpen, currentMonth, onComplete }: Monthly
                         {/* Submit Button */}
                         <Button
                             type="submit"
-                            className="w-full"
-                            disabled={!income || parseFloat(income) <= 0 || createBudget.isPending || (rolloverData && rolloverData.rollover > 0 && rolloverChoice === null)}
+                            className="w-full h-12 rounded-xl font-semibold"
+                            disabled={!income || parseFloat(income) <= 0 || createBudget.isPending || (!!rolloverData && rolloverData.rollover > 0 && rolloverChoice === null)}
                         >
                             {createBudget.isPending ? "Creating Budget..." : "Continue"}
                         </Button>
