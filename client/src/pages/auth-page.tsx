@@ -2,19 +2,42 @@ import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SiGoogle } from "react-icons/si";
-import { ArrowRight, Cloud, ShieldCheck } from "lucide-react";
+import { useState, useEffect } from "react";
+import { AlertCircle, ArrowRight, Cloud, ShieldCheck } from "lucide-react";
 import { useLocation } from "wouter";
-import { useEffect } from "react";
 
 export default function AuthPage() {
     const { signInWithGoogle, user, continueAsGuest, isConfigured } = useAuth();
     const [, setLocation] = useLocation();
+    const [authError, setAuthError] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
         if (user) {
             setLocation("/");
         }
     }, [user, setLocation]);
+
+    const handleGoogleSignIn = async () => {
+        setAuthError(null);
+        setIsLoading(true);
+        try {
+            await signInWithGoogle();
+        } catch (err: any) {
+            console.error("Sign in failed:", err);
+            if (err?.code === "auth/unauthorized-domain") {
+                setAuthError(
+                    "Unauthorized Domain: Firebase blocked this domain. Please add 'expensetracker785.vercel.app' in your Firebase Console under Authentication > Settings > Authorized Domains."
+                );
+            } else if (err?.code === "auth/popup-closed-by-user") {
+                setAuthError("Sign-in popup was closed before completion. Please try again.");
+            } else {
+                setAuthError(err?.message || "Failed to sign in with Google.");
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -29,14 +52,25 @@ export default function AuthPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    {authError && (
+                        <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs space-y-1">
+                            <div className="flex items-center gap-1.5 font-semibold">
+                                <AlertCircle className="w-4 h-4 shrink-0" />
+                                <span>Sign-In Error</span>
+                            </div>
+                            <p className="leading-relaxed">{authError}</p>
+                        </div>
+                    )}
+
                     {isConfigured ? (
                         <Button
                             variant="default"
                             className="w-full py-5 text-sm font-medium"
-                            onClick={() => signInWithGoogle()}
+                            disabled={isLoading}
+                            onClick={handleGoogleSignIn}
                         >
                             <SiGoogle className="mr-2 h-4 w-4" />
-                            Sign in with Google
+                            {isLoading ? "Signing in..." : "Sign in with Google"}
                         </Button>
                     ) : (
                         <p className="text-xs text-center text-muted-foreground bg-muted p-2.5 rounded-md">
