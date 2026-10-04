@@ -10,8 +10,11 @@ import {
   ArrowUpRight,
   ShieldCheck,
   Zap,
+  PiggyBank,
 } from "lucide-react";
+import { Link } from "wouter";
 import { useSettings } from "@/hooks/use-settings";
+import { useSavingsGoals } from "@/hooks/use-savings";
 
 interface BudgetSummary {
   monthlyBudget: number;
@@ -34,7 +37,9 @@ export default function BudgetOverview({
   onSetIncomeClick,
 }: BudgetOverviewProps) {
   const { data: settings } = useSettings();
+  const { data: savingsGoals = [] } = useSavingsGoals();
   const currency = settings?.currency || "PKR";
+  const totalSaved = savingsGoals.reduce((sum, g) => sum + Number(g.currentAmount || 0), 0);
 
   if (isLoading) {
     return (
@@ -101,22 +106,10 @@ export default function BudgetOverview({
         icon: AlertTriangle,
       };
     }
-    if (spentPercentage < 50) {
-      return {
-        text: "Healthy & On Track",
-        badgeBg: "bg-emerald-500/20 text-emerald-200 border-emerald-500/30",
-        icon: ShieldCheck,
-      };
-    }
-    return {
-      text: "Normal Pace",
-      badgeBg: "bg-teal-500/20 text-teal-200 border-teal-500/30",
-      icon: TrendingUp,
-    };
+    return null;
   };
 
   const status = getBudgetStatus();
-  const StatusIcon = status.icon;
 
   return (
     <div className="max-w-md mx-auto px-4 mt-4" data-testid="budget-overview">
@@ -133,12 +126,24 @@ export default function BudgetOverview({
                 <Wallet className="w-3.5 h-3.5 text-emerald-300" /> Available Cash
               </span>
             </div>
-            <div
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border backdrop-blur-md ${status.badgeBg}`}
-            >
-              <StatusIcon className="w-3.5 h-3.5" />
-              <span>{status.text}</span>
-            </div>
+
+            {status ? (
+              <div
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border backdrop-blur-md ${status.badgeBg}`}
+              >
+                <status.icon className="w-3.5 h-3.5" />
+                <span>{status.text}</span>
+              </div>
+            ) : (
+              <Link
+                href="/savings-goals"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border backdrop-blur-md bg-white/10 hover:bg-white/20 border-white/20 text-emerald-200 transition-all active:scale-95 cursor-pointer shadow-xs"
+                title="View Savings & Wealth"
+              >
+                <PiggyBank className="w-3.5 h-3.5 text-emerald-300" />
+                <span>Saved: {currency} {totalSaved.toLocaleString()}</span>
+              </Link>
+            )}
           </div>
 
           {/* Large Available Amount */}
@@ -187,41 +192,63 @@ export default function BudgetOverview({
           {/* Glassmorphic Stats Grid */}
           <div className="grid grid-cols-3 gap-2 pt-1">
             {/* Total Spent */}
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2.5 border border-white/15">
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2 sm:p-2.5 border border-white/15 min-w-0">
               <div className="flex items-center gap-1 text-[11px] text-white/70">
-                <TrendingUp className="w-3 h-3 text-rose-300" />
-                <span>Spent</span>
+                <TrendingUp className="w-3 h-3 text-rose-300 shrink-0" />
+                <span className="truncate">Spent</span>
               </div>
-              <p
-                className="font-display font-bold text-sm sm:text-base text-white mt-1 truncate tnum"
-                data-testid="total-spent"
-              >
-                {currency} {summary.totalSpent.toLocaleString()}
-              </p>
+              <div className="flex items-baseline mt-1 min-w-0">
+                <span className="text-[10px] text-white/70 font-medium shrink-0 mr-0.5">{currency}</span>
+                <span
+                  className="font-display font-bold text-xs sm:text-sm text-white truncate tnum tracking-tight"
+                  data-testid="total-spent"
+                  title={`${currency} ${summary.totalSpent.toLocaleString()}`}
+                >
+                  {summary.totalSpent.toLocaleString()}
+                </span>
+              </div>
             </div>
 
             {/* Total Allocated */}
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2.5 border border-white/15">
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2 sm:p-2.5 border border-white/15 min-w-0">
               <div className="flex items-center gap-1 text-[11px] text-white/70">
-                <Zap className="w-3 h-3 text-amber-300" />
-                <span>Allocated</span>
+                <Zap className="w-3 h-3 text-amber-300 shrink-0" />
+                <span className="truncate">Allocated</span>
               </div>
-              <p className="font-display font-bold text-sm sm:text-base text-white mt-1 truncate tnum">
-                {currency} {summary.totalAllocated.toLocaleString()}
-              </p>
+              <div className="flex items-baseline mt-1 min-w-0">
+                <span className="text-[10px] text-white/70 font-medium shrink-0 mr-0.5">{currency}</span>
+                <span
+                  className="font-display font-bold text-xs sm:text-sm text-white truncate tnum tracking-tight"
+                  title={`${currency} ${summary.totalAllocated.toLocaleString()}`}
+                >
+                  {summary.totalAllocated.toLocaleString()}
+                </span>
+              </div>
             </div>
 
             {/* Daily Budget or Days Left */}
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2.5 border border-white/15">
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-2 sm:p-2.5 border border-white/15 min-w-0">
               <div className="flex items-center gap-1 text-[11px] text-white/70">
-                <Calendar className="w-3 h-3 text-emerald-300" />
-                <span>Daily Pace</span>
+                <Calendar className="w-3 h-3 text-emerald-300 shrink-0" />
+                <span className="truncate">Daily Pace</span>
               </div>
-              <p className="font-display font-bold text-sm sm:text-base text-white mt-1 truncate tnum">
-                {dailyBudget > 0
-                  ? `${currency} ${Math.round(dailyBudget).toLocaleString()}`
-                  : `${summary.daysLeft}d left`}
-              </p>
+              <div className="flex items-baseline mt-1 min-w-0">
+                {dailyBudget > 0 ? (
+                  <>
+                    <span className="text-[10px] text-white/70 font-medium shrink-0 mr-0.5">{currency}</span>
+                    <span
+                      className="font-display font-bold text-xs sm:text-sm text-white truncate tnum tracking-tight"
+                      title={`${currency} ${Math.round(dailyBudget).toLocaleString()}`}
+                    >
+                      {Math.round(dailyBudget).toLocaleString()}
+                    </span>
+                  </>
+                ) : (
+                  <span className="font-display font-bold text-xs sm:text-sm text-white truncate tnum tracking-tight">
+                    {summary.daysLeft}d left
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
