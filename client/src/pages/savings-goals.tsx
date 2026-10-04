@@ -51,7 +51,7 @@ const SAVINGS_CATEGORIES: Array<{
 }> = [
   {
     id: "emergency-fund",
-    name: "Emergency Fund",
+    name: "Emergency Savings",
     icon: Shield,
     color: "#10B981",
     defaultType: "goal",
@@ -75,11 +75,11 @@ const SAVINGS_CATEGORIES: Array<{
   },
   {
     id: "savings-acct",
-    name: "Savings Account",
+    name: "Cumulative Savings",
     icon: Landmark,
     color: "#F59E0B",
     defaultType: "general",
-    description: "Liquid high-yield savings / bank deposits",
+    description: "Liquid reserve & monthly budget sweep surplus",
   },
   {
     id: "gold",
@@ -137,7 +137,7 @@ export default function SavingsGoals() {
   // Filter state
   const [activeTypeTab, setActiveTypeTab] = useState<"all" | SavingsType>("all");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>("all");
-  const [breakdownView, setBreakdownView] = useState<"category" | "goal">("category");
+  const [breakdownView, setBreakdownView] = useState<"category" | "goal">("goal");
   const [chartMetric, setChartMetric] = useState<"saved" | "target">("saved");
 
   // Modals state
@@ -224,7 +224,7 @@ export default function SavingsGoals() {
 
   // Category breakdown for chart and cards
   const categoryBreakdown = useMemo(() => {
-    const map = new Map<string, { categoryId: string; name: string; total: number; target: number; count: number; color: string; icon: any }>();
+    const map = new Map<string, { categoryId: string; name: string; total: number; target: number; sip: number; count: number; color: string; icon: any }>();
 
     goals.forEach((g) => {
       const catId = g.category || "custom";
@@ -234,6 +234,7 @@ export default function SavingsGoals() {
         name: meta.name,
         total: 0,
         target: 0,
+        sip: 0,
         count: 0,
         color: g.color || meta.color,
         icon: meta.icon,
@@ -241,6 +242,7 @@ export default function SavingsGoals() {
 
       existing.total += Number(g.currentAmount || 0);
       existing.target += Number(g.targetAmount || 0);
+      existing.sip += Number(g.monthlyContribution || 0);
       existing.count += 1;
       map.set(catId, existing);
     });
@@ -268,15 +270,45 @@ export default function SavingsGoals() {
     return breakdownView === "category" ? categoryBreakdown : goalBreakdown;
   }, [breakdownView, categoryBreakdown, goalBreakdown]);
 
-  // Donut chart data (filters out 0 values for circular geometry)
+  // Donut chart data: ALWAYS includes and represents ALL categories/goals so all are initially visible
   const chartData = useMemo(() => {
-    return activeBreakdown
-      .map((c) => ({
+    if (activeBreakdown.length === 0) return [];
+
+    const totalRealSaved = activeBreakdown.reduce((sum, c) => sum + (c.total > 0 ? c.total : 0), 0);
+    const totalTarget = activeBreakdown.reduce((sum, c) => sum + (c.target > 0 ? c.target : 0), 0);
+
+    return activeBreakdown.map((c) => {
+      let displayValue = 0;
+
+      if (chartMetric === "saved") {
+        if (totalRealSaved === 0) {
+          // If nothing is saved anywhere yet, divide equally so all categories show
+          displayValue = 1;
+        } else if (c.total > 0) {
+          displayValue = c.total;
+        } else {
+          // Give 0-balance category a modest visible slice (~4% of total) so its colored slice is drawn
+          displayValue = Math.max(1, totalRealSaved * 0.04);
+        }
+      } else {
+        // Target metric
+        if (totalTarget === 0) {
+          displayValue = 1;
+        } else if (c.target > 0) {
+          displayValue = c.target;
+        } else {
+          displayValue = Math.max(1, totalTarget * 0.04);
+        }
+      }
+
+      return {
         name: c.name,
-        value: chartMetric === "saved" ? c.total : (c.target > 0 ? c.target : c.total),
+        value: displayValue,
+        realTotal: chartMetric === "saved" ? c.total : (c.target > 0 ? c.target : c.total),
         color: c.color,
-      }))
-      .filter((c) => c.value > 0);
+        isZero: chartMetric === "saved" ? c.total === 0 : (c.target === 0 && c.total === 0),
+      };
+    });
   }, [activeBreakdown, chartMetric]);
 
   // Filtered goals
@@ -570,6 +602,109 @@ export default function SavingsGoals() {
           </div>
         </div>
 
+        {/* Intuitive Category Wealth Pillars */}
+        {categoryBreakdown.length > 0 && (
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <h3 className="font-display text-sm font-bold tracking-tight">Category Breakdown</h3>
+                <p className="text-[11px] text-muted-foreground">Your wealth across savings pillars</p>
+              </div>
+              {selectedCategoryFilter !== "all" ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategoryFilter("all")}
+                  className="text-xs text-primary font-semibold hover:underline"
+                >
+                  Show All
+                </button>
+              ) : (
+                <span className="text-[11px] text-muted-foreground">
+                  Tap card to filter
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {categoryBreakdown.map((cat) => {
+                const isSelected = selectedCategoryFilter === cat.categoryId;
+                const IconComp = cat.icon || Target;
+                const sharePercent =
+                  portfolioStats.totalSaved > 0
+                    ? ((cat.total / portfolioStats.totalSaved) * 100).toFixed(0)
+                    : "0";
+                const goalProgress =
+                  cat.target > 0 ? Math.min(100, Math.round((cat.total / cat.target) * 100)) : null;
+
+                return (
+                  <Card
+                    key={cat.categoryId}
+                    onClick={() =>
+                      setSelectedCategoryFilter(isSelected ? "all" : cat.categoryId)
+                    }
+                    className={`rounded-2xl border transition-all cursor-pointer relative overflow-hidden active:scale-[0.98] ${
+                      isSelected
+                        ? "border-primary bg-primary/5 shadow-md ring-1 ring-primary/40"
+                        : "border-border/80 bg-card hover:border-primary/40 hover:shadow-xs"
+                    }`}
+                  >
+                    <CardContent className="p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between gap-1">
+                        <div
+                          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-xs"
+                          style={{ backgroundColor: `${cat.color}18`, color: cat.color }}
+                        >
+                          <IconComp className="w-4 h-4" />
+                        </div>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/80 text-muted-foreground tnum">
+                          {cat.count} {cat.count === 1 ? "item" : "items"}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="font-display font-semibold text-xs truncate leading-tight text-foreground" title={cat.name}>
+                          {cat.name}
+                        </h4>
+                        <div className="flex items-baseline mt-1 min-w-0">
+                          <span className="text-[10px] text-muted-foreground font-medium shrink-0 mr-0.5">{currency}</span>
+                          <span className="font-display font-extrabold text-sm sm:text-base text-foreground truncate tnum tracking-tight">
+                            {cat.total.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Pillar Context Details */}
+                      <div className="pt-1.5 border-t border-border/50 text-[10px] space-y-1">
+                        {goalProgress !== null ? (
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-muted-foreground text-[10px]">
+                              <span>Target: {currency} {cat.target.toLocaleString()}</span>
+                              <span className="font-semibold text-foreground">{goalProgress}%</span>
+                            </div>
+                            <Progress value={goalProgress} className="h-1 rounded-full" />
+                          </div>
+                        ) : cat.sip > 0 ? (
+                          <div className="flex items-center justify-between text-muted-foreground text-[10px]">
+                            <span>Monthly SIP</span>
+                            <span className="font-semibold text-foreground">
+                              {currency} {cat.sip.toLocaleString()}/mo
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between text-muted-foreground text-[10px]">
+                            <span>Portfolio Share</span>
+                            <span className="font-semibold text-foreground">{sharePercent}%</span>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Category & Goal Breakdown Section */}
         {activeBreakdown.length > 0 && (
           <Card className="rounded-2xl border-0 shadow-md overflow-hidden">
@@ -657,7 +792,14 @@ export default function SavingsGoals() {
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(val: number) => [`${currency} ${val.toLocaleString()}`, chartMetric === "saved" ? "Saved" : "Target"]}
+                          formatter={(_val: any, _name: any, item: any) => {
+                            const realVal = item?.payload?.realTotal ?? _val;
+                            const isZero = item?.payload?.isZero;
+                            return [
+                              `${currency} ${Number(realVal).toLocaleString()}${isZero ? " (Unfunded)" : ""}`,
+                              chartMetric === "saved" ? "Saved" : "Target"
+                            ];
+                          }}
                           contentStyle={{
                             backgroundColor: "#1e293b",
                             borderColor: "#334155",
@@ -715,9 +857,9 @@ export default function SavingsGoals() {
               </div>
 
               {/* Informative helper if any item is 0 in saved mode */}
-              {chartMetric === "saved" && chartData.length < activeBreakdown.length && (
+              {chartMetric === "saved" && activeBreakdown.some((b) => b.total === 0) && (
                 <p className="text-[10px] text-muted-foreground">
-                  💡 {activeBreakdown.length - chartData.length} bucket(s) currently have {currency} 0 saved. Switch to <button type="button" onClick={() => setChartMetric("target")} className="text-primary font-semibold underline">Target view</button> or add deposits to see them on the donut chart.
+                  💡 {activeBreakdown.filter((b) => b.total === 0).length} bucket(s) currently have {currency} 0 saved (shown with baseline indicator). Tap a goal below to deposit funds or switch to <button type="button" onClick={() => setChartMetric("target")} className="text-primary font-semibold underline">Target view</button>.
                 </p>
               )}
 
