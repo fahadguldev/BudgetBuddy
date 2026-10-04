@@ -12,6 +12,7 @@ import BottomNavigation from "@/components/bottom-navigation";
 import { ArrowLeft, RotateCcw, Cloud, LogIn, LogOut, CheckCircle2, Trash2, AlertTriangle } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/hooks/use-toast";
 import { useResetAllocations, useFactoryReset } from "@/hooks/use-reset-budget";
 import {
     AlertDialog,
@@ -35,6 +36,7 @@ const CURRENCIES = [
 
 export default function Settings() {
     const { user, logout, isConfigured } = useAuth();
+    const { toast } = useToast();
     const [, setLocation] = useLocation();
     const { data: settings } = useSettings();
     const updateSettings = useUpdateSettings();
@@ -156,29 +158,50 @@ export default function Settings() {
                         </CardTitle>
                         <CardDescription>
                             {user
-                                ? "Your budget data is safely backed up and synced to your Google account."
+                                ? "Your budget data is safely backed up and synced to your cloud account."
                                 : "Using BudgetBuddy in offline/guest mode on this device."}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {user ? (
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-muted/40 p-3 rounded-lg border">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-muted/40 p-3.5 rounded-lg border">
                                 <div className="space-y-0.5">
                                     <div className="flex items-center gap-1.5 font-medium text-sm">
                                         <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                                        <span>{user.displayName || "Google User"}</span>
+                                        <span>{user.displayName || user.email || "Active Account"}</span>
                                     </div>
-                                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                                    {user.email && (
+                                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                                    )}
                                 </div>
-                                <Button variant="outline" size="sm" onClick={() => logout()}>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+                                    onClick={async () => {
+                                        try {
+                                            await logout();
+                                            toast({
+                                                title: "Logged Out",
+                                                description: "You have signed out and switched to local offline mode.",
+                                            });
+                                        } catch (error) {
+                                            toast({
+                                                title: "Error",
+                                                description: "Failed to sign out. Please try again.",
+                                                variant: "destructive",
+                                            });
+                                        }
+                                    }}
+                                >
                                     <LogOut className="h-4 w-4 mr-2" />
-                                    Sign Out
+                                    Log Out
                                 </Button>
                             </div>
                         ) : (
                             <div className="space-y-3">
                                 <p className="text-xs text-muted-foreground">
-                                    Sign in to sync your budgets and expenses in real-time across your phone, tablet, and computer.
+                                    Sign in or create an account to sync your budgets and expenses in real-time across your phone, tablet, and computer.
                                 </p>
                                 {isConfigured ? (
                                     <Button
@@ -186,7 +209,7 @@ export default function Settings() {
                                         onClick={() => setLocation("/auth")}
                                     >
                                         <LogIn className="h-4 w-4 mr-2" />
-                                        Sign In with Google
+                                        Sign In / Create Account
                                     </Button>
                                 ) : (
                                     <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded border border-amber-200 dark:border-amber-900">
