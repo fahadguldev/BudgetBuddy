@@ -45,33 +45,33 @@ export default function MonthSelector({ currentMonth, onMonthChange, className =
     };
 
     return (
-        <div className={`flex items-center gap-1 ${className}`}>
+        <div className={`flex items-center gap-0.5 sm:gap-1 ${className}`}>
             <Button
                 variant="ghost"
                 size="icon"
                 onClick={handlePrevious}
                 aria-label="Previous month"
-                className="h-11 w-11 rounded-xl"
+                className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg p-0"
             >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-4 w-4" />
             </Button>
 
             <Select value={currentMonth} onValueChange={onMonthChange}>
-                <SelectTrigger className="w-[160px] h-11 rounded-xl text-sm font-medium" aria-label="Select month">
+                <SelectTrigger className="w-[105px] sm:w-[125px] h-8 sm:h-9 px-2 sm:px-3 rounded-lg text-xs sm:text-sm font-medium" aria-label="Select month">
                     <SelectValue placeholder="Select month">
-                        {format(parseISO(currentMonth + "-01"), "MMMM yyyy")}
+                        {format(parseISO(currentMonth + "-01"), "MMM yyyy")}
                     </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                     {availableMonths.map((budget) => (
-                        <SelectItem key={budget.id} value={budget.month}>
-                            {format(parseISO(budget.month + "-01"), "MMMM yyyy")}
+                        <SelectItem key={budget.id} value={budget.month} className="text-xs sm:text-sm">
+                            {format(parseISO(budget.month + "-01"), "MMM yyyy")}
                         </SelectItem>
                     ))}
                     {/* Always ensure current real-time month is an option if not in the list */}
                     {!availableMonths.find(m => m.month === new Date().toISOString().slice(0, 7)) && (
-                        <SelectItem value={new Date().toISOString().slice(0, 7)}>
-                            {format(new Date(), "MMMM yyyy")}
+                        <SelectItem value={new Date().toISOString().slice(0, 7)} className="text-xs sm:text-sm">
+                            {format(new Date(), "MMM yyyy")}
                         </SelectItem>
                     )}
                 </SelectContent>
@@ -83,9 +83,9 @@ export default function MonthSelector({ currentMonth, onMonthChange, className =
                 onClick={handleNext}
                 disabled={isNextDisabled()}
                 aria-label="Next month"
-                className="h-11 w-11 rounded-xl"
+                className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg p-0"
             >
-                <ChevronRight className="h-5 w-5" />
+                <ChevronRight className="h-4 w-4" />
             </Button>
         </div>
     );

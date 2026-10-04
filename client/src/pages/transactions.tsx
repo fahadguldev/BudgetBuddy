@@ -212,12 +212,12 @@ export default function Transactions() {
       {/* Header */}
       <header className="bg-card/95 backdrop-blur border-b border-border sticky top-0 z-40">
         <div className="max-w-md md:max-w-4xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={() => navigate("/")} data-testid="button-back" aria-label="Back to dashboard" className="h-11 w-11 rounded-xl">
-                <ArrowLeft className="w-5 h-5" />
+          <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <Button variant="ghost" size="icon" onClick={() => navigate("/")} data-testid="button-back" aria-label="Back to dashboard" className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl">
+                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
               </Button>
-              <h1 className="font-display font-bold text-lg tracking-tight">Transactions</h1>
+              <h1 className="font-display font-bold text-base sm:text-lg tracking-tight">Transactions</h1>
             </div>
 
             <MonthSelector

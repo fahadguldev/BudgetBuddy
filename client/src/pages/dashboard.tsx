@@ -85,20 +85,18 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background pb-24 overflow-x-hidden w-full max-w-full">
       {/* Header */}
       <header className="bg-card/95 backdrop-blur-md border-b border-border/80 sticky top-0 z-40">
-        <div className="max-w-md mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-xl flex items-center justify-center shadow-md">
-                <DollarSign className="w-5 h-5 text-white" />
+        <div className="max-w-md mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-lg sm:rounded-xl flex items-center justify-center shadow-md shrink-0">
+                <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
-              <div>
-                <h1 className="font-display font-bold text-lg tracking-tight">
-                  BudgetBuddy
-                </h1>
-              </div>
+              <h1 className="font-display font-bold text-base sm:text-lg tracking-tight shrink-0">
+                BudgetBuddy
+              </h1>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
               <MonthSelector
                 currentMonth={selectedMonth}
                 onMonthChange={setSelectedMonth}
