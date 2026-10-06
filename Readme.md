@@ -1,166 +1,171 @@
 # BudgetBuddy
 
-Your personal finance companion — plan monthly budgets, track expenses by category, and stay on top of spending. Mobile-first PWA that works fully offline as a guest and syncs to the cloud when signed in.
+A local-first personal finance PWA: budgets, transactions, recurring expenses, savings goals, and reports — with an offline-capable IndexedDB store that syncs to Firestore in the background, and PDF export of reports.
 
-## Main Features
+- **Live URL:** none published (Replit + Vercel configs present; runs as a client-only app)
+- **Repository:** https://github.com/fahadguldev/BudgetBuddy
 
-### Monthly Budgeting
-- Set income per month; rollover of unspent balance into the next month is optional
-- Copy previous month's allocations when income stays the same or grows
-- Add extra income mid-month; reset allocations or wipe everything (factory reset) from Settings
+## Project Overview
 
-### Categories & Expenses
-- Custom categories with icons, colors, and per-month allocations
-- Log expenses per category; overspent / nearing-limit / healthy states surface on tiles and dashboard
-- Category tiles filterable by status (all / overspent / nearing / healthy) with search
-- Mobile-friendly entry: bottom-sheet drawer on phones, dialog on desktop
+BudgetBuddy is a single-page React application with **no backend of its own**. The `server/` directory exists but is empty (`routes.ts` and `storage.ts` are both 0 bytes) — persistence is handled entirely in the browser via IndexedDB, with Firebase supplying auth and optional background sync.
 
-### Recurring Expenses
-- One place for repeating costs with automatic processing into the current budget
+| Directory | Role |
+| --- | --- |
+| `client/src/` | The application (pages, hooks, lib, types) |
+| `server/` | **Empty scaffold** — no implementation |
+| `.local/state/replit/` | Replit workspace state |
+| `package-client-only.json`, `vite-client-only.config.ts` | Alternate config to run without the server |
 
-### Savings Goals
-- Three types: one-time goals, SIPs (monthly contributions), and general savings buckets
-- Log contributions with notes and funding source; per-goal progress charts
-- **Sweep**: move leftover balances from chosen categories into a savings goal in one action
+## Problem & Solution
 
-### Insights & History
-- Dashboard: budget overview, spending chart (day / week / month), top categories
-- Transactions page: searchable history with charts and month navigation
-- Export to CSV / PDF for backup or sharing
+Budgeting tools are either spreadsheets (no guardrails, hard on mobile) or cloud accounts (friction to sign up, no offline use, privacy exposure).
 
-### Personalization & Access
-- Currency: PKR, USD, EUR, GBP, INR — money columns use tabular figures so digits don't jitter
-- Theme: light / dark / system, persisted across sessions
-- Google sign-in for cloud sync, or continue fully offline as a guest — no account required
-- Installable PWA with offline support and an offline status pill
-
-## System Architecture
-
-Client-only SPA — no app server in the current build (`server/` is legacy and unused).
-The `StorageService` facade fronts IndexedDB (source of truth) with Firestore as a
-background cloud mirror when signed in.
-
-```text
-┌─────────────────────────────────────────────────────────┐
-│ UI LAYER  pages + components (shadcn/ui, Tailwind)      │
-│  dashboard · manage-budget · transactions · savings …    │
-└───────────────────────┬─────────────────────────────────┘
-                        │ hooks (TanStack Query)
-┌───────────────────────▼─────────────────────────────────┐
-│ DATA-ACCESS LAYER  use-budget · use-expenses ·           │
-│  use-savings · use-recurring · use-settings …            │
-│  queries read via storageService · mutations write then  │
-│  invalidate ["budget", "expenses", "savings-goals" …]    │
-└───────────────────────┬─────────────────────────────────┘
-                        │
-┌───────────────────────▼─────────────────────────────────┐
-│ STORAGE FACADE  lib/storage.ts                          │
-│  every read → IndexedDB · every write → IndexedDB +     │
-│  fire-and-forget mirror to Firestore (signed in only)   │
-└──────────┬──────────────────────────────┬───────────────┘
-           │                               │
-  ┌────────▼────────┐             ┌────────▼────────┐
-  │ LOCAL  IndexedDB│             │ CLOUD  Firestore │
-  │ via `idb`:      │             │ users/{uid}/…   │
-  │ budgets · cats ·│  background │ same docs as    │
-  │ allocs · exp ·  │  sync ─────▶│ local · login   │
-  │ incomes · goals │             │ triggers upload │
-  └─────────────────┘             └─────────────────┘
-┌─────────────────────────────────────────────────────────┐
-│ AUTH  Firebase Auth (Google) · guest mode = full local  │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Data Flow
-- **Read path**: component hook → React Query cache → `storageService` → IndexedDB → render. No network on the critical path, so the UI is instant online or off.
-- **Write path**: mutation → IndexedDB write → `queryClient.invalidateQueries(...)` → refetch from IndexedDB → background `setDoc`/`deleteDoc` to Firestore (signed in only, non-blocking; failures only warn).
-- **Login path**: `onAuthStateChanged` → `storageService.initializeData()` migrates any local-only data to `users/{uid}/…`, then the header badge flips from Local Mode to Synced.
-- **Auth is optional**: route guards show a spinner while loading, then allow guests and users alike everywhere.
-
-## Caching Strategy
-
-Four layers, each with a distinct job:
-
-| Layer | Where | What it caches | Invalidation |
-| --- | --- | --- | --- |
-| **React Query** | In-memory | Query results per key (`["budget",…]`, `["expenses",…]`, `["savings-goals"]`, …). `staleTime: Infinity`, no refetch on focus/interval, no retries — see `lib/queryClient.ts` | Manual: every mutation invalidates its keys (e.g. contribution → `["savings-goals"]`); factory reset calls `queryClient.clear()` |
-| **IndexedDB** | Device disk (`idb`, stores: budgets, categories, allocations, expenses, incomes, goals, settings) | Source of truth for all domain data; survives reloads and offline. Migrates legacy `localStorage` keys once, dedupes categories, seeds defaults + settings | Writes go through `storageService`/mutations only, so cache and UI never diverge |
-| **Firestore persistent cache** | Device disk (multi-tab manager, initialized before any Firestore op) | Cloud doc mirror for offline reads; write queue that flushes on reconnect | Managed by the Firestore SDK — no app code needed |
-| **PWA service worker** | Browser cache (`vite-plugin-pwa`, `autoUpdate`) | App shell + static assets, `offline.html` fallback | New service worker activates on next load after a production deploy |
-
-Offline behavior: reads serve from IndexedDB (and Firestore cache when signed in); writes persist locally and sync later. The `SyncStatus` pill appears only while `navigator.onLine === false`.
+BudgetBuddy's answer is **local-first**: the app works immediately with no account (guest mode), stores everything in IndexedDB, stays usable offline as an installable PWA, and only syncs to Firestore when the user is signed in. Reports export to PDF, so data leaves the device only when the user chooses.
 
 ## Tech Stack
 
-- **Frontend**: React 18 + TypeScript + Vite, wouter routing, TanStack Query, React Hook Form + Zod
-- **UI**: shadcn/ui (Radix primitives), Tailwind CSS, Lucide icons, Recharts, Framer Motion
-- **Storage**: local-first — IndexedDB (`idb`) is the source of truth; Firestore syncs in the background when signed in
-- **Auth**: Firebase Auth (Google sign-in) with guest mode; no account required
-- **PWA**: `vite-plugin-pwa` with offline fallback
-
-## Routes
-
-| Path | Page |
+| Layer | Technology |
 | --- | --- |
-| `/` | Dashboard |
-| `/budget-setup` | Initial budget setup |
-| `/manage-budget` | Allocations, extra income, categories |
-| `/transactions` | History + charts |
-| `/recurring-expenses` | Recurring costs |
-| `/savings-goals` | Goals, contributions, sweep |
-| `/settings` | Currency, theme, data, auth |
-| `/auth` | Sign in / continue as guest |
+| Frontend | React 18 + TypeScript, Vite |
+| UI | shadcn/ui (Radix primitives — ~31 `@radix-ui/*` packages), Tailwind CSS, `tailwindcss-animate`, `@tailwindcss/typography` |
+| Icons & Charts | Lucide React, React Icons, Recharts |
+| State & Data | TanStack Query, React Context, custom hooks (`use-budget`, `use-expenses`, `use-savings`, `use-recurring`, `use-settings`) |
+| Forms | React Hook Form + Zod validation |
+| Storage | IndexedDB via `idb` (`lib/indexeddb-storage.ts`) as source of truth; Firestore as background sync |
+| Auth | Firebase Auth (Google sign-in) with guest mode |
+| Export | `jspdf` + `jspdf-autotable` (`lib/export-utils.ts`) |
+| Motion & Misc | Framer Motion, `embla-carousel-react`, `next-themes` (dark mode), `react-resizable-panels`, `react-day-picker` |
+| PWA | `vite-plugin-pwa` with offline fallback |
+| Backend | none (Firebase SDK only) |
+| Tooling | Vite, TypeScript, ESLint, `npm run check` (tsc --noEmit) |
 
-Auth is optional — all app routes work for guests and signed-in users alike.
+## System Architecture
 
-## Getting Started
+```
+   React 18 SPA (Vite, PWA-installable)
+   ┌──────────────────────────────────────────────┐
+   │ pages/  auth-page  budget-setup  dashboard   │
+   │         transactions  recurring-expenses     │
+   │         savings-goals  manage-budget         │
+   │         settings  not-found                  │
+   │                                              │
+   │ hooks/  use-budget  use-expenses  use-savings│
+   │         use-recurring  use-settings          │
+   │         use-reset-budget  use-reset-trans.   │
+   │                                              │
+   │ lib/    indexeddb-storage.ts  storage.ts     │
+   │         db.ts  firebase.ts  queryClient.ts   │
+   │         export-utils.ts (jsPDF)  icons/utils │
+   └───────┬──────────────────────────┬───────────┘
+           │                          │
+     IndexedDB (idb)            Firebase SDK
+     SOURCE OF TRUTH            ├── Firebase Auth
+     survives offline           │   (Google / guest)
+           │                    └── Firestore
+           │                        background sync
+           └── reads/writes happen here first,
+               remote is a mirror, never a blocker
+```
+
+The read path never waits on the network: hooks read IndexedDB and publish through TanStack Query's cache.
+
+## Key Features
+
+- **Budget setup & management** — `budget-setup.tsx`, `manage-budget.tsx` with `use-budget`.
+- **Transaction ledger** — `transactions.tsx` + `use-expenses`.
+- **Recurring expenses** — `recurring-expenses.tsx` + `use-recurring`.
+- **Savings goals** — `savings-goals.tsx` + `use-savings`.
+- **Dashboard** — `dashboard.tsx` with Recharts visualisations.
+- **Settings** — `settings.tsx` + `use-settings`.
+- **Guest mode** — use the app with no account; auth is optional (`auth-page.tsx`).
+- **Offline-first** — IndexedDB is authoritative; `vite-plugin-pwa` provides an offline fallback so the app launches without a connection.
+- **PDF reports** — `export-utils.ts` builds reports with `jspdf` + `jspdf-autotable`.
+- **Dark mode** — `next-themes`.
+- **Data reset controls** — `use-reset-budget`, `use-reset-transactions`.
+- **Responsive shell** — `use-mobile`, `react-resizable-panels`.
+- **Type-checked budgeting logic** — Zod schemas shared between form input and stored records.
+
+## Setup & Run
 
 ```bash
+git clone https://github.com/fahadguldev/BudgetBuddy
+cd BudgetBuddy
 npm install
-cp .env.example .env        # fill in your Firebase keys (optional — app runs in Local Mode without them)
-npm run dev                 # start Vite dev server
+npm run dev        # Vite dev server
 ```
-
-| Script | What it does |
-| --- | --- |
-| `npm run dev` | Start dev server |
-| `npm run build` | Production build to `dist/` |
-| `npm run preview` | Preview the production build |
-| `npm run check` | Type-check (`tsc --noEmit`) |
-
-## Environment
-
-Firebase keys are optional. Without them the app runs fully offline in Local Mode.
 
 ```bash
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
-VITE_FIREBASE_MEASUREMENT_ID=...
+npm run check      # tsc --noEmit  (type check)
+npm run build      # vite build
 ```
 
-See `.env.example` (and `client/.env.example`) for placeholders. Never commit a real `.env` — it is git-ignored.
+Environment (`.env.example`, 7 variables — all `VITE_` prefixed, all client-exposed):
 
-## Project Structure
-
-```text
-client/
-  src/
-    pages/        # dashboard, manage-budget, transactions, recurring-expenses, savings-goals, settings, auth-page
-    components/   # modals, charts, tiles, navigation, data-management, sync-status
-    context/      # auth-context (user, guest mode, Firebase wiring)
-    hooks/        # use-budget, use-expenses, use-savings, use-recurring, use-reset-budget, use-settings
-    lib/          # storage (local-first + Firestore sync), indexeddb-storage, firebase, icons, export-utils
-    types/        # Budget, Category, Expense, SavingsGoal, RecurringExpense, AppSettings
-  public/icons/   # PWA icons + offline.html
-vite.config.ts    # client root, PWA manifest, envDir at repo root
+```
+VITE_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN
+VITE_FIREBASE_PROJECT_ID
+VITE_FIREBASE_STORAGE_BUCKET
+VITE_FIREBASE_MESSAGING_SENDER_ID
+VITE_FIREBASE_APP_ID
+VITE_FIREBASE_MEASUREMENT_ID
 ```
 
-## Notes
+Only the first four are needed for auth + Firestore sync; the analytics IDs are optional. Without any Firebase config the app still runs against IndexedDB in guest mode.
 
-- Currency defaults to PKR; change it in Settings.
-- Savings sweep moves remaining balances from chosen categories into a savings goal in one action.
-- `server/` is legacy and not used by the current client-only build.
+An alternate client-only setup is available if you want to skip the (empty) server entirely:
+
+```bash
+# uses package-client-only.json + vite-client-only.config.ts
+```
+
+`.replit` indicates the project was developed on Replit.
+
+## Technical Decisions
+
+- **Local-first over cloud-first.** Writes hit IndexedDB synchronously, then sync in the background. The app stays instant and offline-capable, and Firebase becomes an availability *enhancement* rather than a dependency.
+- **IndexedDB as source of truth, Firestore as mirror.** The reverse ordering would make every budget edit a network round-trip and break offline use — which is the point of the project.
+- **`server/` left intentionally empty rather than stubbed.** `routes.ts` and `storage.ts` are 0 bytes: no fake endpoints, no pretend API. The client-only config makes the intent explicit.
+- **shadcn/ui over a component library.** Radix primitives are copied into the repo, so styling and behaviour are owned locally instead of being fought through a library's theming layer.
+- **React Hook Form + Zod.** One schema validates the form and the stored record, preventing a class of "valid input, invalid record" bugs.
+- **jsPDF client-side.** Generating reports in the browser keeps financial data on-device — consistent with the privacy stance.
+- **TanStack Query over hand-rolled state.** Cache invalidation and re-render batching for ~9 hooks would be a lot of untested code to write by hand.
+- **`vite-plugin-pwa`.** A budgeting app is checked in short bursts on bad connections; an offline fallback makes those bursts work.
+
+## Challenges & Solutions
+
+- **Schema migrations without a server.** IndexedDB versioning in `lib/indexeddb-storage.ts` handles object-store upgrades; `db.ts` centralises the connection so migrations run in one place.
+- **Keeping derived numbers consistent.** Budget remaining, goal progress, and recurring totals are computed in hooks rather than stored, so editing one transaction cannot leave stale aggregates behind.
+- **Guest then sign-in.** Records created in guest mode must survive authentication — handled by the storage layer being identity-agnostic, with Firestore syncing as a mirror.
+- **Reset without collateral damage.** Separate `use-reset-budget` and `use-reset-transactions` hooks let a user start a new month without wiping goals.
+- **Form/record drift.** Zod schemas are shared, so the same type guards both the input and the persisted row.
+
+## Honest Gaps
+
+- **`server/` is empty.** `routes.ts` and `storage.ts` are 0-byte files. There is no API, no server-side validation, and no multi-device reconciliation — if the same account is used on two devices, last-write-wins on Firestore sync is the entire conflict strategy.
+- **No tests.** `package.json` offers only `dev`, `build`, `preview`, and `check`. There is no unit or integration test of the budget arithmetic, which is exactly where a finance app needs coverage.
+- **No live deployment URL.** `.replit` and `vercel.json` exist, but no production URL is published, so the PWA and offline behaviour are unverified from outside.
+- **`package-client-only.json` suggests the two-config split caused friction** rather than being a clean architecture: there are two `package.json` files and two Vite configs to keep in sync.
+- **All Firebase values are `VITE_`-prefixed and therefore public.** That is normal for Firebase web config (security comes from Security Rules), but it means the Firestore rules — not present in this repo — are the actual access control.
+- **Repository history is a single squashed commit**, so no development timeline can be inferred.
+
+## Deployment Status
+
+| Surface | URL | Status |
+| --- | --- | --- |
+| Web app | — | not deployed (Replit/Vercel configs present) |
+| Backend | — | none by design |
+
+## Lessons Learned
+
+- Local-first is not a cache strategy — it is an ordering decision. If IndexedDB is authoritative, the network is never on the critical path, and the app works in the places budgeting actually happens (on a phone, on a train).
+- An empty `server/` directory is honest; a fake one with stubbed routes is not. The client-only config makes the boundary explicit.
+- In a finance app, the untested code is the arithmetic. Type checking catches shape errors, not wrong sums.
+- Two `package.json` files is a smell that a dependency decision was deferred; resolve it once rather than maintaining both.
+- Security for a Firebase-backed client lives in the console's rules, not the repo — document where those rules live or they will be forgotten.
+
+## Author
+
+**Muhammad Fahad** - [@fahadguldev](https://github.com/fahadguldev)
+
+Repository: https://github.com/fahadguldev/BudgetBuddy
